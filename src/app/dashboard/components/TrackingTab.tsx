@@ -7,14 +7,11 @@ import type {
   Task,
   FeatureTodoItem,
 } from "@/types";
-import { updateFeatureStatus } from "@/app/actions/features";
-import { updateTask, deleteTask } from "@/app/actions/tasks";
 import {
   createTimelineEvent,
   updateTimelineEvent,
   deleteTimelineEvent,
 } from "@/app/actions/timeline";
-import TaskItem from "./TaskItem";
 import { useConfirm } from "@/hooks/useConfirm";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { parseFeatureActionItems } from "@/utils/featureTodos";
@@ -24,24 +21,20 @@ interface TrackingTabProps {
   onUpdate: () => void;
 }
 
-type ViewType = "overview" | "kanban" | "tasks" | "timeline";
+type ViewType = "overview" | "timeline";
 
 export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
   // Restore saved view from localStorage on mount
   const getSavedView = (): ViewType => {
     if (typeof window === "undefined") return "overview";
     const saved = localStorage.getItem(`tracking-view-${project.id}`);
-    if (saved && ["overview", "kanban", "tasks", "timeline"].includes(saved)) {
+    if (saved && ["overview", "timeline"].includes(saved)) {
       return saved as ViewType;
     }
     return "overview";
   };
 
   const [activeView, setActiveView] = useState<ViewType>(getSavedView);
-  const [draggedItem, setDraggedItem] = useState<{
-    type: "feature" | "task";
-    id: string;
-  } | null>(null);
   const { isOpen, options, showConfirm, handleConfirm, handleCancel } =
     useConfirm();
 
@@ -52,50 +45,11 @@ export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
     }
   }, [activeView, project.id]);
 
-  // Optimistic state for smooth Kanban dragging
-  // Use a ref to track the last synced project data to avoid unnecessary resets
-  const [optimisticFeatures, setOptimisticFeatures] = useState<
-    FeatureWithTasks[]
-  >(project.features || []);
-  const [optimisticTasks, setOptimisticTasks] = useState<Task[]>(() => [
+  const allTasks: Task[] = [
     ...project.tasks,
     ...(project.features || []).flatMap((f) => f.tasks),
-  ]);
-
-  // Sync optimistic state when project data changes from server
-  // This ensures we stay in sync but doesn't block UI during drag operations
-  useEffect(() => {
-    // Only sync if we're not currently dragging (to avoid interrupting smooth drag)
-    if (!draggedItem) {
-      const nextFeatures = project.features || [];
-      setOptimisticFeatures((previous) => {
-        if (previous.length !== nextFeatures.length) {
-          return nextFeatures;
-        }
-        const isSame = previous.every(
-          (feature, index) => feature.id === nextFeatures[index].id
-        );
-        return isSame ? previous : nextFeatures;
-      });
-
-      const nextTasks = [
-        ...project.tasks,
-        ...(project.features || []).flatMap((f) => f.tasks),
-      ];
-      setOptimisticTasks((previous) => {
-        if (previous.length !== nextTasks.length) {
-          return nextTasks;
-        }
-        const isSame = previous.every(
-          (task, index) => task.id === nextTasks[index].id
-        );
-        return isSame ? previous : nextTasks;
-      });
-    }
-  }, [project.features, project.tasks, draggedItem]);
-
-  const allTasks: Task[] = optimisticTasks;
-  const features = optimisticFeatures;
+  ];
+  const features = project.features || [];
 
   const featureTodosById = useMemo((): Record<string, FeatureTodoItem[]> => {
     return features.reduce<Record<string, FeatureTodoItem[]>>(
@@ -267,165 +221,6 @@ export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
     }
   };
 
-  const handleUpdateFeatureStatus = async (
-    featureId: string,
-    status: "IDEA" | "PLANNING" | "IN_PROGRESS" | "COMPLETED"
-  ) => {
-    try {
-      const feature = features.find((f) => f.id === featureId);
-      if (status === "COMPLETED" && feature && feature.status !== "COMPLETED") {
-        await handleAddTimelineEvent(
-          `Completed: ${feature.name}`,
-          "FEATURE_COMPLETE",
-          featureId
-        );
-      }
-      await updateFeatureStatus(featureId, status);
-      onUpdate();
-      // Keep on current view instead of reloading
-    } catch (err) {
-      console.error("Error updating feature status:", err);
-      alert("Failed to update feature status");
-    }
-  };
-
-  const handleUpdateTaskStatus = async (
-    taskId: string,
-    status: "TODO" | "IN_PROGRESS" | "DONE",
-    isStandalone: boolean
-  ) => {
-    try {
-      await updateTask(taskId, {
-        status,
-        completedAt: status === "DONE" ? new Date() : null,
-      });
-      onUpdate();
-      // Keep on current view instead of reloading
-    } catch (err) {
-      console.error("Error updating task status:", err);
-      alert("Failed to update task status");
-    }
-  };
-
-  const handleUpdateTask = async (
-    taskId: string,
-    updates: {
-      title?: string;
-      description?: string | null;
-      status?: "TODO" | "IN_PROGRESS" | "DONE";
-      priority?: "LOW" | "MEDIUM" | "HIGH";
-    }
-  ) => {
-    try {
-      await updateTask(taskId, {
-        ...updates,
-        completedAt: updates.status === "DONE" ? new Date() : undefined,
-      });
-      onUpdate();
-      // Keep on tasks view - don't change activeView
-    } catch (err) {
-      console.error("Error updating task:", err);
-      alert("Failed to update task");
-    }
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    const confirmed = await showConfirm({
-      title: "Delete Task",
-      message:
-        "Are you sure you want to delete this task? This action cannot be undone.",
-      confirmText: "Delete",
-      cancelText: "Cancel",
-    });
-
-    if (!confirmed) return;
-
-    try {
-      await deleteTask(taskId);
-      onUpdate();
-    } catch (err) {
-      console.error("Error deleting task:", err);
-      alert("Failed to delete task");
-    }
-  };
-
-  const handleDrop = async (
-    targetStatus: "COMPLETED" | "IN_PROGRESS" | "IDEA",
-    isFeature: boolean
-  ) => {
-    if (!draggedItem) return;
-
-    // Optimistic update - update UI immediately
-    if (isFeature) {
-      setOptimisticFeatures((prev) =>
-        prev.map((f) =>
-          f.id === draggedItem.id
-            ? {
-                ...f,
-                status: targetStatus as
-                  | "IDEA"
-                  | "PLANNING"
-                  | "IN_PROGRESS"
-                  | "COMPLETED",
-              }
-            : f
-        )
-      );
-    } else {
-      const taskStatus =
-        targetStatus === "COMPLETED"
-          ? "DONE"
-          : targetStatus === "IN_PROGRESS"
-          ? "IN_PROGRESS"
-          : "TODO";
-      setOptimisticTasks((prev) =>
-        prev.map((t) =>
-          t.id === draggedItem.id
-            ? {
-                ...t,
-                status: taskStatus,
-                completedAt: taskStatus === "DONE" ? new Date() : null,
-              }
-            : t
-        )
-      );
-    }
-
-    setDraggedItem(null);
-
-    // Sync with server in background (non-blocking)
-    try {
-      if (isFeature) {
-        await handleUpdateFeatureStatus(draggedItem.id, targetStatus);
-      } else {
-        const taskStatus =
-          targetStatus === "COMPLETED"
-            ? "DONE"
-            : targetStatus === "IN_PROGRESS"
-            ? "IN_PROGRESS"
-            : "TODO";
-        await handleUpdateTaskStatus(
-          draggedItem.id,
-          taskStatus,
-          project.tasks.some((t) => t.id === draggedItem.id)
-        );
-      }
-      // Refresh data to ensure consistency (but don't block UI)
-      onUpdate();
-    } catch (err) {
-      console.error("Error handling drop:", err);
-      // Rollback optimistic update on error
-      if (isFeature) {
-        setOptimisticFeatures(project.features || []);
-      } else {
-        setOptimisticTasks([
-          ...project.tasks,
-          ...(project.features || []).flatMap((f) => f.tasks),
-        ]);
-      }
-      alert("Failed to update status. Please try again.");
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -433,8 +228,6 @@ export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
       <div className="flex justify-center gap-4 border-b border-border">
         {[
           { id: "overview" as ViewType, label: "Overview" },
-          { id: "kanban" as ViewType, label: "Kanban" },
-          { id: "tasks" as ViewType, label: "Tasks" },
           { id: "timeline" as ViewType, label: "Timeline" },
         ].map((view) => (
           <button
@@ -471,39 +264,12 @@ export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
         />
       )}
 
-      {/* Kanban View */}
-      {activeView === "kanban" && (
-        <KanbanView
-          completedFeatures={completedFeatures}
-          inProgressFeatures={inProgressFeatures}
-          futureFeatures={futureFeatures}
-          allTasks={allTasks}
-          project={project}
-          draggedItem={draggedItem}
-          setDraggedItem={setDraggedItem}
-          onDrop={handleDrop}
-          featureTodosById={featureTodosById}
-        />
-      )}
-
       {/* Timeline View */}
       {activeView === "timeline" && (
         <TimelineView
           project={project}
           onAddTimelineEvent={handleAddTimelineEvent}
           onUpdate={onUpdate}
-        />
-      )}
-
-      {/* Tasks View */}
-      {activeView === "tasks" && (
-        <TasksView
-          allTasks={allTasks}
-          project={project}
-          onUpdateTask={handleUpdateTask}
-          onDeleteTask={handleDeleteTask}
-          onViewChange={setActiveView}
-          featureTodosById={featureTodosById}
         />
       )}
 
@@ -554,7 +320,7 @@ function OverviewView({
     momentum: string;
     previousWeekTasks: number;
   };
-  onViewChange: (view: "overview" | "kanban" | "timeline" | "tasks") => void;
+  onViewChange: (view: "overview" | "timeline") => void;
   totalFeatureTodos: number;
   completedFeatureTodos: number;
   upcomingFeatureTodos: Array<{
@@ -859,338 +625,6 @@ function OverviewView({
   );
 }
 
-// Kanban View Component
-function KanbanView({
-  completedFeatures,
-  inProgressFeatures,
-  futureFeatures,
-  allTasks,
-  project,
-  draggedItem,
-  setDraggedItem,
-  onDrop,
-  featureTodosById,
-}: {
-  completedFeatures: FeatureWithTasks[];
-  inProgressFeatures: FeatureWithTasks[];
-  futureFeatures: FeatureWithTasks[];
-  allTasks: Task[];
-  project: ProjectWithRelations;
-  draggedItem: { type: "feature" | "task"; id: string } | null;
-  setDraggedItem: (
-    item: { type: "feature" | "task"; id: string } | null
-  ) => void;
-  onDrop: (
-    targetStatus: "COMPLETED" | "IN_PROGRESS" | "IDEA",
-    isFeature: boolean
-  ) => Promise<void>;
-  featureTodosById: Record<string, FeatureTodoItem[]>;
-}) {
-  const todoTasks = allTasks.filter((t) => t.status === "TODO").length;
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Delivered Column */}
-        <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-          <h3 className="text-xl font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 bg-accent rounded-full" />
-            Delivered (
-            {completedFeatures.length +
-              allTasks.filter((t) => t.status === "DONE").length}
-            )
-          </h3>
-          <div
-            className="space-y-3 min-h-[400px]"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              onDrop("COMPLETED", draggedItem?.type === "feature");
-            }}
-          >
-            {completedFeatures.map((feature) => {
-              const featureTodos = featureTodosById[feature.id] ?? [];
-              const activeTodos = featureTodos.filter(
-                (todo) => !todo.completed
-              );
-              const completedTodosCount =
-                featureTodos.length - activeTodos.length;
-
-              return (
-                <div
-                  key={feature.id}
-                  draggable
-                  onDragStart={() =>
-                    setDraggedItem({ type: "feature", id: feature.id })
-                  }
-                  className="bg-surface-alt border border-border rounded-lg p-4 cursor-move hover:shadow-md transition"
-                >
-                  <div className="font-semibold text-text-primary">
-                    {feature.name}
-                  </div>
-                  <div className="text-text-secondary text-sm mt-1">
-                    {feature.description}
-                  </div>
-                  <div className="text-text-primary/60 text-xs mt-2">
-                    {feature.tasks.length} tasks
-                  </div>
-                  {featureTodos.length > 0 && (
-                    <div className="mt-3 border-t border-border/60 pt-3">
-                      <div className="flex items-center justify-between text-[11px] text-text-primary/60 mb-2">
-                        <span>Feature To-Dos</span>
-                        <span>
-                          {completedTodosCount}/{featureTodos.length} complete
-                        </span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {featureTodos.slice(0, 3).map((todo) => (
-                          <div
-                            key={todo.id}
-                            className="flex items-start gap-2 text-xs text-text-secondary"
-                          >
-                            <span
-                              className={`mt-1 w-2 h-2 rounded-full ${
-                                todo.completed ? "bg-green-400" : "bg-accent"
-                              }`}
-                            />
-                            <span
-                              className={
-                                todo.completed
-                                  ? "line-through text-text-primary/50"
-                                  : "text-text-secondary"
-                              }
-                            >
-                              {todo.text}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {featureTodos.length > 3 && (
-                        <div className="text-[11px] text-text-primary/50 mt-2">
-                          + {featureTodos.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {allTasks
-              .filter((t) => t.status === "DONE")
-              .map((task) => (
-                <div
-                  key={task.id}
-                  draggable
-                  onDragStart={() =>
-                    setDraggedItem({ type: "task", id: task.id })
-                  }
-                  className="bg-surface-alt border border-border rounded-lg p-3 cursor-move hover:shadow-md transition"
-                >
-                  <div className="font-medium text-text-primary/60 line-through">
-                    {task.title}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* Currently Delivering Column */}
-        <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-          <h3 className="text-xl font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 bg-accent rounded-full" />
-            In Progress (
-            {inProgressFeatures.length +
-              allTasks.filter((t) => t.status === "IN_PROGRESS").length}
-            )
-          </h3>
-          <div
-            className="space-y-3 min-h-[400px]"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              onDrop("IN_PROGRESS", draggedItem?.type === "feature");
-            }}
-          >
-            {inProgressFeatures.map((feature) => {
-              const featureTodos = featureTodosById[feature.id] ?? [];
-              const completedTodosCount = featureTodos.filter(
-                (todo) => todo.completed
-              ).length;
-
-              return (
-                <div
-                  key={feature.id}
-                  draggable
-                  onDragStart={() =>
-                    setDraggedItem({ type: "feature", id: feature.id })
-                  }
-                  className="bg-surface-alt border border-border rounded-lg p-4 cursor-move hover:shadow-md transition"
-                >
-                  <div className="font-semibold text-text-primary">
-                    {feature.name}
-                  </div>
-                  <div className="text-text-secondary text-sm mt-1">
-                    {feature.description}
-                  </div>
-                  <div className="text-text-primary/60 text-xs mt-2">
-                    {feature.tasks.length} tasks
-                  </div>
-                  {featureTodos.length > 0 && (
-                    <div className="mt-3 border-t border-border/60 pt-3">
-                      <div className="flex items-center justify-between text-[11px] text-text-primary/60 mb-2">
-                        <span>Feature To-Dos</span>
-                        <span>
-                          {completedTodosCount}/{featureTodos.length} complete
-                        </span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {featureTodos.slice(0, 3).map((todo) => (
-                          <div
-                            key={todo.id}
-                            className="flex items-start gap-2 text-xs text-text-secondary"
-                          >
-                            <span
-                              className={`mt-1 w-2 h-2 rounded-full ${
-                                todo.completed ? "bg-green-400" : "bg-accent"
-                              }`}
-                            />
-                            <span
-                              className={
-                                todo.completed
-                                  ? "line-through text-text-primary/50"
-                                  : "text-text-secondary"
-                              }
-                            >
-                              {todo.text}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {featureTodos.length > 3 && (
-                        <div className="text-[11px] text-text-primary/50 mt-2">
-                          + {featureTodos.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {allTasks
-              .filter((t) => t.status === "IN_PROGRESS")
-              .map((task) => (
-                <div
-                  key={task.id}
-                  draggable
-                  onDragStart={() =>
-                    setDraggedItem({ type: "task", id: task.id })
-                  }
-                  className="bg-surface-alt border border-border rounded-lg p-3 cursor-move hover:shadow-md transition"
-                >
-                  <div className="font-medium text-text-primary">
-                    {task.title}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* Future Features Column */}
-        <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-          <h3 className="text-xl font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 bg-accent rounded-full" />
-            Future ({futureFeatures.length + todoTasks})
-          </h3>
-          <div
-            className="space-y-3 min-h-[400px]"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              onDrop("IDEA", draggedItem?.type === "feature");
-            }}
-          >
-            {futureFeatures.map((feature) => {
-              const featureTodos = featureTodosById[feature.id] ?? [];
-
-              return (
-                <div
-                  key={feature.id}
-                  draggable
-                  onDragStart={() =>
-                    setDraggedItem({ type: "feature", id: feature.id })
-                  }
-                  className="bg-surface-alt border border-border rounded-lg p-4 cursor-move hover:shadow-md transition"
-                >
-                  <div className="font-semibold text-text-primary">
-                    {feature.name}
-                  </div>
-                  <div className="text-text-secondary text-sm mt-1">
-                    {feature.description}
-                  </div>
-                  <div className="text-text-primary/60 text-xs mt-2">
-                    {feature.tasks.length} tasks
-                  </div>
-                  {featureTodos.length > 0 && (
-                    <div className="mt-3 border-t border-border/60 pt-3">
-                      <div className="flex items-center justify-between text-[11px] text-text-primary/60 mb-2">
-                        <span>Feature To-Dos</span>
-                        <span>{featureTodos.length} total</span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {featureTodos.slice(0, 3).map((todo) => (
-                          <div
-                            key={todo.id}
-                            className="flex items-start gap-2 text-xs text-text-secondary"
-                          >
-                            <span
-                              className={`mt-1 w-2 h-2 rounded-full ${
-                                todo.completed ? "bg-green-400" : "bg-accent"
-                              }`}
-                            />
-                            <span
-                              className={
-                                todo.completed
-                                  ? "line-through text-text-primary/50"
-                                  : "text-text-secondary"
-                              }
-                            >
-                              {todo.text}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {featureTodos.length > 3 && (
-                        <div className="text-[11px] text-text-primary/50 mt-2">
-                          + {featureTodos.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {allTasks
-              .filter((t) => t.status === "TODO")
-              .map((task) => (
-                <div
-                  key={task.id}
-                  draggable
-                  onDragStart={() =>
-                    setDraggedItem({ type: "task", id: task.id })
-                  }
-                  className="bg-surface-alt border border-border rounded-lg p-3 cursor-move hover:shadow-md transition"
-                >
-                  <div className="font-medium text-text-primary">
-                    {task.title}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Timeline View Component
 function TimelineView({
   project,
@@ -1418,129 +852,4 @@ function TimelineView({
   );
 }
 
-// Tasks View Component
-function TasksView({
-  allTasks,
-  project,
-  onUpdateTask,
-  onDeleteTask,
-  onViewChange,
-  featureTodosById,
-}: {
-  allTasks: Task[];
-  project: ProjectWithRelations;
-  onUpdateTask: (
-    taskId: string,
-    updates: {
-      title?: string;
-      description?: string | null;
-      status?: "TODO" | "IN_PROGRESS" | "DONE";
-      priority?: "LOW" | "MEDIUM" | "HIGH";
-    }
-  ) => Promise<void>;
-  onDeleteTask: (taskId: string) => Promise<void>;
-  onViewChange: (view: "overview" | "kanban" | "timeline" | "tasks") => void;
-  featureTodosById: Record<string, FeatureTodoItem[]>;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-        <h2 className="text-2xl font-light text-text-primary mb-4">
-          All Tasks
-        </h2>
-        <div className="space-y-2">
-          {allTasks.length === 0 ? (
-            <div className="text-text-primary text-center py-8">
-              No tasks yet. Add tasks in the Design Document tab.
-            </div>
-          ) : (
-            allTasks.map((task) => {
-              const isStandalone = project.tasks.some((t) => t.id === task.id);
-              return (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  onUpdate={(updates) => {
-                    onUpdateTask(task.id, updates);
-                  }}
-                  onDelete={() => onDeleteTask(task.id)}
-                />
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-light text-text-primary">
-            Feature To-Dos
-          </h2>
-          <button
-            type="button"
-            onClick={() => onViewChange("overview")}
-            className="text-sm text-accent hover:text-accent font-medium"
-          >
-            View Overview →
-          </button>
-        </div>
-        <div className="space-y-4">
-          {project.features
-            .map((feature) => ({
-              feature,
-              todos: featureTodosById[feature.id] ?? [],
-            }))
-            .filter(({ todos }) => todos.length > 0)
-            .map(({ feature, todos }) => {
-              const completed = todos.filter((todo) => todo.completed).length;
-              return (
-                <div
-                  key={feature.id}
-                  className="bg-surface-alt rounded-xl p-4 border border-border"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-text-primary">
-                      {feature.name}
-                    </h3>
-                    <span className="text-xs text-text-primary/60">
-                      {completed}/{todos.length} complete
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {todos.map((todo) => (
-                      <div
-                        key={todo.id}
-                        className="flex items-start gap-2 text-xs text-text-secondary"
-                      >
-                        <span
-                          className={`mt-1 w-2 h-2 rounded-full ${
-                            todo.completed ? "bg-green-400" : "bg-accent"
-                          }`}
-                        />
-                        <span
-                          className={
-                            todo.completed
-                              ? "line-through text-text-primary/50"
-                              : "text-text-secondary"
-                          }
-                        >
-                          {todo.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          {project.features.every(
-            (feature) => (featureTodosById[feature.id] ?? []).length === 0
-          ) && (
-            <div className="text-text-secondary text-center py-8">
-              No feature to-dos yet. Capture action items from the Planning tab.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+// Removed TasksView - moved to PlanningTab

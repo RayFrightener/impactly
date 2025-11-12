@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getProject } from "@/app/actions/projects";
+import { getProject, deleteProject } from "@/app/actions/projects";
 import type { ProjectWithRelations } from "@/types";
 import TrackingTab from "./TrackingTab";
 import PlanningTab from "./PlanningTab";
 import LoadingScreen from "@/components/LoadingScreen";
+import { useConfirm } from "@/hooks/useConfirm";
+import ConfirmationModal from "@/components/ConfirmationModal";
 
 interface ProjectWorkspaceProps {
   projectId: string;
@@ -24,6 +26,8 @@ export default function ProjectWorkspace({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("tracking");
+  const { isOpen, options, showConfirm, handleConfirm, handleCancel } =
+    useConfirm();
 
   const loadProject = useCallback(
     async (showLoading = true) => {
@@ -60,6 +64,28 @@ export default function ProjectWorkspace({
     loadProject(false);
   }, [loadProject]);
 
+  const handleDeleteProject = async () => {
+    if (!project) return;
+
+    const confirmed = await showConfirm({
+      title: "Delete Project",
+      message:
+        "Are you sure you want to delete this project? This action cannot be undone and will delete all associated features, tasks, and data.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await deleteProject(project.id);
+      onBack();
+    } catch (err) {
+      console.error("Error deleting project:", err);
+      alert("Failed to delete project");
+    }
+  };
+
   if (loading) {
     return <LoadingScreen message="Loading project..." />;
   }
@@ -93,15 +119,24 @@ export default function ProjectWorkspace({
             >
               ← Back to Projects
             </button>
-            <div>
-              <h1 className="text-3xl font-light text-text-primary">
-                {project.name}
-              </h1>
-              {project.description && (
-                <p className="text-text-secondary text-sm mt-1">
-                  {project.description}
-                </p>
-              )}
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-3xl font-light text-text-primary">
+                  {project.name}
+                </h1>
+                {project.description && (
+                  <p className="text-text-secondary text-sm mt-1">
+                    {project.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleDeleteProject}
+                className="text-text-primary hover:text-red-400 hover:bg-red-50 px-3 py-2 rounded-lg transition font-medium text-sm"
+                title="Delete project"
+              >
+                Delete
+              </button>
             </div>
           </div>
           <button
@@ -142,6 +177,16 @@ export default function ProjectWorkspace({
           <PlanningTab project={project} onUpdate={handleUpdate} />
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={isOpen}
+        title={options.title}
+        message={options.message}
+        confirmText={options.confirmText}
+        cancelText={options.cancelText}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }
