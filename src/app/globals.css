@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --theme-background: #f4f6ff;
+  --theme-surface: #eef2ff;
+  --theme-surface-alt: #dbeafe;
+  --theme-card: #ffffff;
+  --theme-border: #cbd5ff;
+  --theme-text-primary: #1f2937;
+  --theme-text-secondary: #4b5563;
+  --theme-header: #e0e7ff;
+  --theme-accent: #7c3aed;
+  --theme-accent-contrast: #ffffff;
+  --theme-button: #4f46e5;
+  --theme-button-text: #ffffff;
+  --theme-progress: #6366f1;
+  --theme-placeholder: #7c83f8;
+}
+
+@theme inline {
+  --color-background: var(--theme-background);
+  --color-surface: var(--theme-surface);
+  --color-surface-alt: var(--theme-surface-alt);
+  --color-card: var(--theme-card);
+  --color-border: var(--theme-border);
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-secondary: var(--theme-text-secondary);
+  --color-header: var(--theme-header);
+  --color-accent: var(--theme-accent);
+  --color-accent-contrast: var(--theme-accent-contrast);
+  --color-button: var(--theme-button);
+  --color-button-text: var(--theme-button-text);
+  --color-progress: var(--theme-progress);
+  --color-placeholder: var(--theme-placeholder);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  background-color: var(--theme-background);
+}
+
+body {
+  background-color: var(--theme-background);
+  color: var(--theme-text-primary);
+  font-family: Arial, Helvetica, sans-serif;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+::placeholder {
+  color: var(--theme-placeholder);
+  opacity: 0.72;
+  transition: color 200ms ease;
+}
+
+@keyframes slideUpFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thought-enter-animation {
+  animation: slideUpFadeIn 0.4s ease-out forwards;
+}

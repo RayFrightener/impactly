@@ -1,0 +1,184 @@
+# Cursor AI Coding Rules
+
+## TypeScript Strict Typing Rules
+
+### NEVER use `any` type
+- Always define proper interfaces or types
+- Use `unknown` if the type is truly unknown, then narrow it with type guards
+- Use generics when dealing with reusable components
+
+### Type Definitions
+- All component props must have explicit interfaces
+- All function parameters must be typed
+- All state variables must have explicit types (especially useState)
+- All API responses should have typed interfaces
+
+### Common Patterns
+
+#### State Management
+```typescript
+// ✅ GOOD
+interface FormData {
+  field1: string;
+  field2: number;
+}
+const [data, setData] = useState<FormData>({ field1: "", field2: 0 });
+
+// ❌ BAD
+const [data, setData] = useState<any>({});
+```
+
+#### Event Handlers
+```typescript
+// ✅ GOOD
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ...
+};
+
+// ❌ BAD
+const handleChange = (e: any) => {
+  // ...
+};
+```
+
+#### Type Guards
+```typescript
+// ✅ GOOD
+const isBullyingReport = (
+  report: AdminBullyingReport | AdminHarassmentReport
+): report is AdminBullyingReport => {
+  return "victimName" in report;
+};
+
+// ❌ BAD
+const isBullyingReport = (report: any): report is AdminBullyingReport => {
+  return "victimName" in report;
+};
+```
+
+#### Date Handling
+```typescript
+// ✅ GOOD - Handle both string and Date types
+const formatDate = (date: string | Date | null | undefined): string => {
+  if (!date) return "";
+  const dateStr = date instanceof Date ? date.toISOString() : date.toString();
+  return dateStr.split("T")[0];
+};
+
+// ❌ BAD - Assumes only string
+const formatDate = (date: string): string => {
+  return date.split("T")[0]; // Will fail if date is Date object
+};
+```
+
+### Next.js 15 Requirements
+
+#### Dynamic Route Params
+```typescript
+// ✅ GOOD - Next.js 15 requires Promise<> for params
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  // use id...
+}
+
+// ❌ BAD - Will cause build errors
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  // accessing params.id without await
+}
+```
+
+### React JSX Rules
+
+#### Escaped Entities
+```typescript
+// ✅ GOOD
+<p>Click &quot;Start&quot; to begin.</p>
+<p>Click {'"Start"'} to begin.</p>
+
+// ❌ BAD
+<p>Click "Start" to begin.</p>
+```
+
+### File Organization
+
+#### Type Files Location
+- `/src/types/` - All shared type definitions
+- Component-specific types can be in the same file but should still be properly defined
+- API response types should match database schema types
+
+### Prisma/Database Types
+
+When working with Prisma:
+1. Always check the schema for actual field names
+2. Admin types may differ from form submission types
+3. Create separate types for:
+   - Form submissions (what users fill)
+   - Database models (what Prisma returns)
+   - API responses (what gets sent to frontend)
+
+### Build Verification
+
+Before committing:
+1. Run `npm run build` to catch all type errors
+2. Fix all TypeScript errors (don't use @ts-ignore unless absolutely necessary)
+3. Fix all ESLint warnings related to types
+
+## Summary
+
+**Golden Rules:**
+1. NO `any` types - EVER
+2. ALL parameters must be typed
+3. ALL state must be explicitly typed
+4. Next.js 15 dynamic params must be Promise<>
+5. Always handle both string and Date types for date fields
+6. Run build before committing
+
+## Project Planning
+
+### Plan Documentation
+When creating or updating project plans:
+
+1. **Always save plans externally** to `/plans/` directory
+2. **Naming convention:** `NN-descriptive-name.md` (e.g., `01-analytics-plan.md`)
+3. **Required sections:**
+   - Goal/Overview
+   - Implementation phases
+   - Success metrics
+   - Tech stack decisions
+   - Timeline
+
+4. **Version control:** Plans directory is gitignored
+5. **Plan format:** Markdown (.md) for readability
+6. **Updates:** When plans change, update the .md file
+
+This ensures plans are:
+- Persistent across sessions
+- Easy to reference and update
+- Available for team members
+- Separate from code commits
+
+### Documentation & Milestone Files
+**CRITICAL:** All documentation and milestone tracking files must go in `/plans/milestones/`, NOT in `/src/utils/` or any source code directory.
+
+**Files that belong in `/plans/milestones/`:**
+- Implementation status/progress documents (e.g., `IMPLEMENTATION_STATUS.md`, `REFACTOR_PROGRESS.md`)
+- Completion summaries (e.g., `PHASE1_COMPLETE.md`, `IMPLEMENTATION_COMPLETE.md`)
+- Migration guides (e.g., `DATABASE_MIGRATION_GUIDE.md`, `DASHBOARD_MIGRATION_COMPLETE.md`)
+- Bug fix documentation (e.g., `FOLDER_DELETE_BUG_FIX.md`)
+- Build/status tracking files (e.g., `BUILD_STATUS.md`)
+- Feature guides (e.g., `ADMIN_ANALYTICS_GUIDE.md`)
+- Any other `.md` documentation files that track project milestones, status, or implementation details
+
+**Rules:**
+- ✅ **DO:** Place all `.md` documentation files in `/plans/milestones/`
+- ❌ **DON'T:** Place documentation files in `/src/utils/` or any source code directory
+- The `/src/utils/` directory is for utility functions only, not documentation
+
+This keeps documentation organized and separate from source code.
+

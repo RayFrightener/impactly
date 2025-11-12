@@ -1,0 +1,343 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+ 
+generator client {
+  provider = "prisma-client-js"
+}
+ 
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String          @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  // Optional for WebAuthn support
+  Authenticator Authenticator[]
+  
+  // Impactly relations
+  projects       Project[]
+  journalEntries JournalEntry[]
+  analytics      Analytics[]
+  userMetrics    UserMetrics?
+  feedbacks      Feedback[]
+  feedbackVotes  FeedbackVote[]
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+ 
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([provider, providerAccountId])
+}
+ 
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+ 
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@id([identifier, token])
+}
+ 
+// Optional for WebAuthn support
+model Authenticator {
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([userId, credentialID])
+}
+
+// Impactly Models
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  moreInfo    String?       @db.Text
+  status      ProjectStatus @default(ACTIVE)
+  
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  thoughts    Thought[]
+  features    Feature[]
+  tasks       Task[]
+  timeline    TimelineEvent[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Thought {
+  id        String   @id @default(cuid())
+  text      String   @db.Text
+  expanded  String?  @db.Text
+  
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+}
+
+model Feature {
+  id          String        @id @default(cuid())
+  name        String
+  description String        @db.Text
+  impact      String        @db.Text
+  expanded    String?       @db.Text
+  status      FeatureStatus @default(IDEA)
+  priority    Int           @default(0)
+  
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  tasks       Task[]
+  actionItems Json          // Array of strings
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  completedAt DateTime?
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  featureId   String?
+  feature     Feature?     @relation(fields: [featureId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  completedAt DateTime?
+}
+
+model TimelineEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  date        DateTime
+  type        EventType
+  
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  featureId   String?
+  
+  createdAt   DateTime  @default(now())
+}
+
+model JournalEntry {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  mood      String?
+  tags      Json?    // Array of strings
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Enums for type safety
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum FeatureStatus {
+  IDEA
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum EventType {
+  MILESTONE
+  FEATURE_COMPLETE
+  RELEASE
+}
+
+// Analytics Models
+model Analytics {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Event tracking
+  eventType    String   // 'project_created', 'task_completed', 'session_start', etc.
+  eventData    Json?    // Additional event metadata
+  
+  // Session tracking
+  sessionId    String?
+  duration     Int?     // in seconds
+  
+  // Context
+  platform     String?  // 'web', 'mobile'
+  userAgent    String?
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model UserMetrics {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Engagement metrics (for resume)
+  totalProjects         Int      @default(0)
+  completedProjects     Int      @default(0)
+  totalTasks            Int      @default(0)
+  completedTasks        Int      @default(0)
+  
+  // Time metrics (productivity impact)
+  totalTimeSpent        Int      @default(0) // seconds
+  averageSessionTime    Int      @default(0) // seconds
+  
+  // Streak metrics (retention)
+  currentStreak         Int      @default(0) // days
+  longestStreak         Int      @default(0) // days
+  lastActiveDate        DateTime?
+  
+  // Feature adoption
+  featuresUsed          Json     @default("[]") // Array of feature names
+  
+  // Satisfaction
+  npsScore              Int?     // Net Promoter Score (0-10)
+  
+  updatedAt             DateTime @updatedAt
+}
+
+// Feedback Models
+model Feedback {
+  id            String         @id @default(cuid())
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  type          FeedbackType
+  title         String
+  description   String         @db.Text
+  
+  // Context
+  page          String?
+  screenshot    String?
+  userAgent     String?
+  
+  // Status
+  status        FeedbackStatus @default(PENDING)
+  priority      FeedbackPriority @default(MEDIUM)
+  
+  // Engagement
+  upvotes       Int            @default(0)
+  votes         FeedbackVote[]
+  
+  // Privacy
+  isAnonymous   Boolean        @default(false)
+  
+  // Internal notes
+  adminNotes    String?        @db.Text
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model FeedbackVote {
+  id          String   @id @default(cuid())
+  feedbackId  String
+  feedback    Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([feedbackId, userId])
+}
+
+enum FeedbackType {
+  BUG
+  FEATURE_REQUEST
+  IMPROVEMENT
+  PRAISE
+  OTHER
+}
+
+enum FeedbackStatus {
+  PENDING
+  REVIEWING
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+}
+
+enum FeedbackPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
