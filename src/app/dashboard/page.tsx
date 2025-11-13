@@ -247,7 +247,7 @@ function DashboardContent() {
               </h1>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-button text-button-text px-10 py-4 rounded-2xl hover:opacity-90 transition-all duration-200 font-bold text-xl flex items-center gap-4 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-100 transform"
+                className="bg-[#6366f1] text-white px-10 py-4 rounded-2xl hover:bg-[#818cf8] transition-all duration-200 font-bold text-xl flex items-center gap-4 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-100 transform"
               >
                 <span className="text-3xl font-light">+</span>
                 Create New Project
@@ -349,7 +349,7 @@ function DashboardContent() {
                               {project.name}
                             </h3>
                             <div className="flex flex-col items-end gap-1">
-                              <span className="text-xs px-2 py-1 bg-button group-hover:opacity-90 text-button-text rounded-full capitalize transition-colors">
+                              <span className="text-xs px-2 py-1 bg-[#6366f1] group-hover:bg-[#818cf8] text-white rounded-full capitalize transition-colors font-medium">
                                 {project.status}
                               </span>
                               {stats.hasActivity &&

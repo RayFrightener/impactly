@@ -238,6 +238,143 @@ const shouldCreateFile = createNewParam === "true";
 - TypeScript warnings
 - Style/linting suggestions
 
+### No Hardcoding - Environment & Configuration Rules
+
+**CRITICAL: NEVER hardcode values that could differ between environments or need to be configurable.**
+
+Since code is regularly deployed, hardcoded values can cause production issues, security vulnerabilities, and deployment failures.
+
+#### What NOT to Hardcode
+
+**❌ NEVER hardcode:**
+- URLs, API endpoints, or base paths
+- API keys, secrets, or tokens
+- Database connection strings
+- Port numbers
+- Environment-specific values (dev/staging/prod)
+- Feature flags or toggles
+- Timeout values or retry counts
+- File paths (especially absolute paths)
+- Email addresses or user IDs
+- Domain names or hostnames
+- Magic numbers or constants that might change
+
+#### What TO Do Instead
+
+**✅ ALWAYS use:**
+- Environment variables (`process.env.NEXT_PUBLIC_*` for client-side, `process.env.*` for server-side)
+- Configuration files (e.g., `config.ts`, `constants.ts` with environment-based values)
+- Constants files that read from environment variables
+- Next.js environment variable system
+- Runtime configuration when possible
+
+#### Examples
+
+```typescript
+// ❌ BAD - Hardcoded values
+const API_URL = "https://api.example.com/v1";
+const API_KEY = "sk-1234567890abcdef";
+const TIMEOUT = 5000;
+const MAX_RETRIES = 3;
+const ADMIN_EMAIL = "admin@example.com";
+
+// ✅ GOOD - Environment variables
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_KEY = process.env.API_KEY || "";
+const TIMEOUT = Number(process.env.API_TIMEOUT) || 5000;
+const MAX_RETRIES = Number(process.env.MAX_RETRIES) || 3;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
+
+// ✅ GOOD - Configuration file
+// config/api.ts
+export const apiConfig = {
+  url: process.env.NEXT_PUBLIC_API_URL || "",
+  timeout: Number(process.env.API_TIMEOUT) || 5000,
+  maxRetries: Number(process.env.MAX_RETRIES) || 3,
+};
+
+// ✅ GOOD - Constants file with env-based values
+// constants/index.ts
+export const APP_CONFIG = {
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || "",
+  environment: process.env.NODE_ENV || "development",
+  isProduction: process.env.NODE_ENV === "production",
+} as const;
+```
+
+#### File Paths
+
+```typescript
+// ❌ BAD - Hardcoded absolute paths
+const filePath = "/home/user/projects/impactly/uploads/file.txt";
+const uploadDir = "/var/www/uploads";
+
+// ✅ GOOD - Use relative paths or environment variables
+const filePath = path.join(process.cwd(), "uploads", "file.txt");
+const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+```
+
+#### API Endpoints
+
+```typescript
+// ❌ BAD - Hardcoded endpoints
+const response = await fetch("https://api.example.com/v1/users/123");
+
+// ✅ GOOD - Use environment variables or config
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+const response = await fetch(`${baseUrl}/users/123`);
+```
+
+#### Feature Flags
+
+```typescript
+// ❌ BAD - Hardcoded feature flags
+const enableFeature = true;
+
+// ✅ GOOD - Environment-based feature flags
+const enableFeature = process.env.NEXT_PUBLIC_ENABLE_FEATURE === "true";
+```
+
+#### When Hardcoding is Acceptable
+
+**Only hardcode:**
+- Mathematical constants (e.g., `Math.PI`, `Math.E`)
+- Standard HTTP status codes (e.g., `200`, `404`, `500`) - though enums are better
+- CSS class names or component names
+- Internal type definitions or interfaces
+- Pure mathematical calculations
+- Standard library constants
+
+**Even then, prefer:**
+- Named constants or enums for better maintainability
+- Configuration objects for related values
+
+```typescript
+// ✅ ACCEPTABLE - But enum is better
+const HTTP_STATUS = {
+  OK: 200,
+  NOT_FOUND: 404,
+  INTERNAL_ERROR: 500,
+} as const;
+
+// ✅ BETTER - Use enum
+enum HttpStatus {
+  OK = 200,
+  NOT_FOUND = 404,
+  INTERNAL_ERROR = 500,
+}
+```
+
+#### Pre-Deployment Checklist
+
+Before deploying, verify:
+1. ✅ No hardcoded URLs, API keys, or secrets
+2. ✅ All environment variables are documented
+3. ✅ All environment variables have fallback values where appropriate
+4. ✅ Configuration files use environment variables
+5. ✅ No absolute file paths (use `process.cwd()` or relative paths)
+6. ✅ Feature flags are environment-based
+
 ## Summary
 
 **Golden Rules:**
@@ -247,6 +384,7 @@ const shouldCreateFile = createNewParam === "true";
 4. Next.js 15 dynamic params must be Promise<>
 5. Always handle both string and Date types for date fields
 6. Run build before committing
+7. NEVER hardcode values - Use environment variables and configuration files (critical for regular deployments)
 
 ## Project Planning
 

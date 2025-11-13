@@ -99,7 +99,7 @@ function JournalPageContent() {
     searchParams.get("projectId") || null
   );
   const [viewMode, setViewMode] = useState<ViewMode>("stream");
-  
+
   // Initialize currentThoughtContent - will be auto-committed if from dashboard
   const [currentThoughtContent, setCurrentThoughtContent] =
     useState<string>("");
@@ -386,7 +386,11 @@ function JournalPageContent() {
   // Handle query params from dashboard journal showcase - create file with thought or auto-commit
   useEffect(() => {
     // Prevent duplicate processing
-    if (hasAutoCommittedRef.current || hasCreatedFileRef.current || hasCreatedFileFromDashboardRef.current) {
+    if (
+      hasAutoCommittedRef.current ||
+      hasCreatedFileRef.current ||
+      hasCreatedFileFromDashboardRef.current
+    ) {
       return;
     }
 
@@ -398,14 +402,15 @@ function JournalPageContent() {
 
     let contentToCommit = "";
     let shouldProcess = false;
-    const shouldCreateFile = createNewParam === "true" || fromDashboardParam === "true";
+    const shouldCreateFile =
+      createNewParam === "true" || fromDashboardParam === "true";
     let projectIdForFile: string | undefined = undefined; // Store project ID for immediate use
 
     // Handle new fromDashboard flow (button-based)
     if (fromDashboardParam === "true" && contentKeyParam) {
       // Mark that we came from dashboard
       cameFromDashboardRef.current = true;
-      
+
       // Retrieve from localStorage - new format uses journal-dashboard- prefix
       const storageKey = `journal-dashboard-${contentKeyParam}`;
       const storedContent = localStorage.getItem(storageKey);
@@ -436,7 +441,7 @@ function JournalPageContent() {
     } else if (thoughtParam) {
       // Legacy: URL param flow
       cameFromDashboardRef.current = true;
-      
+
       // Decode thought content
       try {
         contentToCommit = decodeURIComponent(thoughtParam);
@@ -445,7 +450,9 @@ function JournalPageContent() {
         console.error("Error decoding thought param:", err);
         // Fallback: try to decode with error recovery
         try {
-          contentToCommit = decodeURIComponent(thoughtParam.replace(/%[0-9A-F]{0,2}$/i, ""));
+          contentToCommit = decodeURIComponent(
+            thoughtParam.replace(/%[0-9A-F]{0,2}$/i, "")
+          );
           shouldProcess = true;
         } catch (fallbackErr) {
           console.error("Error in fallback decode:", fallbackErr);
@@ -461,7 +468,9 @@ function JournalPageContent() {
         shouldProcess = true;
         // Clean up sessionStorage after reading
         sessionStorage.removeItem(storageKey);
-        const storedProjectId = sessionStorage.getItem(`${storageKey}-projectId`);
+        const storedProjectId = sessionStorage.getItem(
+          `${storageKey}-projectId`
+        );
         if (storedProjectId) {
           sessionStorage.removeItem(`${storageKey}-projectId`);
           if (storedProjectId !== selectedProjectId) {
@@ -479,9 +488,12 @@ function JournalPageContent() {
 
     if (shouldProcess && contentToCommit.trim()) {
       const trimmedContent = contentToCommit.trim();
-      
+
       // Calculate word count for metadata
-      const words = trimmedContent.trim().split(/\s+/).filter((w) => w.length > 0);
+      const words = trimmedContent
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length > 0);
       const wordCount = words.length;
       const lineCount = trimmedContent.split("\n").length;
 
@@ -491,11 +503,15 @@ function JournalPageContent() {
           hasCreatedFileRef.current = true;
           hasCreatedFileFromDashboardRef.current = true; // Track dashboard-initiated creation
           hasAutoCommittedRef.current = true; // Prevent auto-commit after file creation
-          
+
           const now = new Date();
           // Use projectIdForFile if set (from dashboard), otherwise fallback to URL param or current state
-          const finalProjectId = projectIdForFile || projectIdParam || selectedProjectId || undefined;
-          
+          const finalProjectId =
+            projectIdForFile ||
+            projectIdParam ||
+            selectedProjectId ||
+            undefined;
+
           // Generate file name - need to get project name if we have a project ID
           let defaultName: string;
           if (finalProjectId) {
@@ -503,20 +519,22 @@ function JournalPageContent() {
             const project = projects.find((p) => p.id === finalProjectId);
             const projectName = project?.name || "Project";
             const pad = (value: number) => value.toString().padStart(2, "0");
-            const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-              now.getDate()
-            )}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+            const timestamp = `${now.getFullYear()}-${pad(
+              now.getMonth() + 1
+            )}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(
+              now.getMinutes()
+            )}`;
             defaultName = `${projectName} Journal ${timestamp}`;
           } else {
             defaultName = generateDefaultFileName();
           }
-          
+
           // Create thought object
           const newThought: Thought = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             content: trimmedContent,
           };
-          
+
           // Create journal session with thought already included
           const newSession: JournalSession = {
             id: Date.now().toString(),
@@ -538,7 +556,8 @@ function JournalPageContent() {
             content: trimmedContent.substring(0, 50) + "...",
             projectId: finalProjectId,
             thoughtId: newThought.id,
-            thoughtsInSession: (newSession as PersistedJournalSession).thoughts?.length || 0,
+            thoughtsInSession:
+              (newSession as PersistedJournalSession).thoughts?.length || 0,
           });
 
           // Save to storage
@@ -548,7 +567,7 @@ function JournalPageContent() {
             currentFolderPath === "/" ? undefined : currentFolderPath,
             finalProjectId
           );
-          
+
           console.log("File created with ID:", fileId);
 
           // Load and open the new file immediately
@@ -556,24 +575,30 @@ function JournalPageContent() {
           if (newFile) {
             // Load the journal directly - set all state to match the file
             const journalWithThoughts = newFile as PersistedJournalSession;
-            
+
             console.log("Loaded file:", {
               fileId,
               hasThoughts: !!journalWithThoughts.thoughts,
               thoughtsCount: journalWithThoughts.thoughts?.length || 0,
               rawThoughtsCount: journalWithThoughts.rawThoughts?.length || 0,
             });
-            
+
             // Convert lines to thoughts if loading old format
             const loadedThoughts: Thought[] = journalWithThoughts.thoughts
               ? journalWithThoughts.thoughts
-              : (journalWithThoughts.rawThoughts || []).map((line: string, index: number) => ({
-                  id: `thought-${index}-${Date.now()}`,
-                  content: line,
-                }));
-            
-            console.log("Loaded thoughts:", loadedThoughts.length, loadedThoughts);
-            
+              : (journalWithThoughts.rawThoughts || []).map(
+                  (line: string, index: number) => ({
+                    id: `thought-${index}-${Date.now()}`,
+                    content: line,
+                  })
+                );
+
+            console.log(
+              "Loaded thoughts:",
+              loadedThoughts.length,
+              loadedThoughts
+            );
+
             // Set all state to match the file
             setThoughts(loadedThoughts);
             setLines(journalWithThoughts.rawThoughts || []);
@@ -581,7 +606,9 @@ function JournalPageContent() {
             setCurrentLine("");
             setCurrentThoughtContent("");
             if (journalWithThoughts.sessionStartTime) {
-              setSessionStartTime(new Date(journalWithThoughts.sessionStartTime));
+              setSessionStartTime(
+                new Date(journalWithThoughts.sessionStartTime)
+              );
             }
             setCurrentFileId(fileId);
             const metadata = getItemMetadata(fileId);
@@ -597,21 +624,22 @@ function JournalPageContent() {
             } else {
               setLastSavedAt(null);
             }
-            
+
             // Trigger file explorer refresh
             setFileExplorerRefreshTrigger((prev) => prev + 1);
-            
+
             preventInitialAutosaveRef.current = true;
             setAutosaveStatus("idle");
             setAutosaveError(null);
             setViewMode("stream");
-            
+
             // Scroll to show thoughts after file is loaded
             const scrollTimer = setTimeout(() => {
               requestAnimationFrame(() => {
                 if (thoughtsContainerRef.current && loadedThoughts.length > 0) {
                   // Scroll to bottom to show the thoughts
-                  thoughtsContainerRef.current.scrollTop = thoughtsContainerRef.current.scrollHeight;
+                  thoughtsContainerRef.current.scrollTop =
+                    thoughtsContainerRef.current.scrollHeight;
                 }
                 // Focus textarea after scrolling
                 if (inputRef.current) {
@@ -619,11 +647,13 @@ function JournalPageContent() {
                 }
               });
             }, 500);
-            
+
             return () => clearTimeout(scrollTimer);
           } else {
             // Fallback: if file loading fails, just auto-commit
-            console.error("Failed to load created file, falling back to auto-commit");
+            console.error(
+              "Failed to load created file, falling back to auto-commit"
+            );
             hasCreatedFileRef.current = false;
             hasCreatedFileFromDashboardRef.current = false;
             // Continue to auto-commit fallback below
@@ -641,13 +671,13 @@ function JournalPageContent() {
       if (!hasCreatedFileRef.current) {
         // Mark that we've auto-committed to prevent duplicates
         hasAutoCommittedRef.current = true;
-        
+
         // Auto-commit the content as a thought (same logic as Shift+Enter)
         const newThought: Thought = {
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
           content: trimmedContent,
         };
-        
+
         // Add new thought to the end so it appears at bottom (near input)
         setThoughts((prev) => [...prev, newThought]);
         // Mark as new for animation
@@ -691,7 +721,7 @@ function JournalPageContent() {
             }
           });
         }, 300);
-        
+
         return () => clearTimeout(focusTimer);
       }
     }
@@ -700,7 +730,12 @@ function JournalPageContent() {
       setSelectedProjectId(projectIdParam);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, generateDefaultFileName, currentFolderPath, selectedProjectId]);
+  }, [
+    searchParams,
+    generateDefaultFileName,
+    currentFolderPath,
+    selectedProjectId,
+  ]);
 
   // Load saved journals list
   useEffect(() => {
@@ -1060,7 +1095,6 @@ function JournalPageContent() {
     };
   }, [viewMode]);
 
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter") {
       if (e.shiftKey) {
@@ -1075,7 +1109,7 @@ function JournalPageContent() {
           // Reset file creation flags
           hasCreatedFileRef.current = false;
           hasCreatedFileFromDashboardRef.current = false;
-          
+
           const newThought: Thought = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             content: currentThoughtContent.trim(),
@@ -1196,6 +1230,12 @@ function JournalPageContent() {
     setCurrentThoughtContent(e.target.value);
     // Keep currentLine for backward compatibility
     setCurrentLine(e.target.value);
+  };
+
+  const handlePaste = () => {
+    // Allow default paste behavior - textarea will handle it automatically
+    // Don't prevent default or stop propagation - let the browser handle paste normally
+    // This handler is here to ensure paste events work correctly
   };
 
   // Helper function to render line with highlights
@@ -1615,7 +1655,8 @@ function JournalPageContent() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to export journal";
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to export journal";
       alert(`Export failed: ${errorMessage}`);
       console.error("Export error:", error);
     }
@@ -1659,10 +1700,13 @@ function JournalPageContent() {
           setPendingImport(journal);
           setShowImportConfirm(true);
         } else {
-          alert("Failed to import journal. The file format is invalid or corrupted. Please check the console for details.");
+          alert(
+            "Failed to import journal. The file format is invalid or corrupted. Please check the console for details."
+          );
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
         alert(`Import failed: ${errorMessage}`);
         console.error("Import error:", error);
       } finally {
@@ -1800,7 +1844,7 @@ function JournalPageContent() {
     try {
       const now = new Date();
       const defaultName = generateDefaultFileName();
-      
+
       // Create empty journal session
       const newSession: JournalSession = {
         id: Date.now().toString(),
@@ -1836,10 +1880,10 @@ function JournalPageContent() {
           type: "file",
           path: newFile.path || currentFolderPath,
         } as JournalFile;
-        
+
         // Trigger file explorer refresh
         setFileExplorerRefreshTrigger((prev) => prev + 1);
-        
+
         handleOpenFile(journalFile);
       } else {
         // Fallback: just clear state if file creation fails
@@ -1993,7 +2037,7 @@ function JournalPageContent() {
                 if (id === currentFileId) {
                   handleCreateNewJournal();
                 }
-                
+
                 // Wrap deleteItem in Promise for async handling
                 await new Promise<void>((resolve, reject) => {
                   try {
@@ -2003,14 +2047,17 @@ function JournalPageContent() {
                     reject(error);
                   }
                 });
-                
+
                 setSavedJournals(listSavedJournals());
                 // Update refresh trigger to ensure file explorer updates
                 setFileExplorerRefreshTrigger((prev) => prev + 1);
               } catch (error) {
                 console.error("Delete failed:", error);
-                const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                alert(`Failed to delete ${type}: ${errorMessage}. Please try again.`);
+                const errorMessage =
+                  error instanceof Error ? error.message : "Unknown error";
+                alert(
+                  `Failed to delete ${type}: ${errorMessage}. Please try again.`
+                );
                 // Refresh to restore state
                 setSavedJournals(listSavedJournals());
                 setFileExplorerRefreshTrigger((prev) => prev + 1);
@@ -2158,7 +2205,7 @@ function JournalPageContent() {
                                 handleDrop(e, thought.id);
                               }
                             }}
-                            className={`group relative p-4 bg-[#867979]/10 border border-[#867979]/30 rounded-lg hover:bg-[#867979]/20 transition-all duration-300 ${
+                            className={`group relative p-4 bg-[#867979]/10 border border-[#867979]/30 rounded-lg hover:bg-[#867979]/20 transition-all duration-300 overflow-hidden ${
                               draggedThoughtId === thought.id
                                 ? "opacity-50"
                                 : ""
@@ -2265,6 +2312,8 @@ function JournalPageContent() {
                                     style={{
                                       userSelect: "text",
                                       cursor: "text",
+                                      wordBreak: "break-word",
+                                      overflowWrap: "anywhere",
                                     }}
                                   >
                                     {renderThoughtWithHighlights(
@@ -2308,6 +2357,7 @@ function JournalPageContent() {
                           value={currentThoughtContent}
                           onChange={handleChange}
                           onKeyDown={handleKeyDown}
+                          onPaste={handlePaste}
                           onBlur={() => setIsFocused(false)}
                           onFocus={() => setIsFocused(true)}
                           className="bg-transparent text-[#D0CCCC] text-lg font-mono leading-relaxed w-full outline-none border-none focus:outline-none resize-none min-h-[60px]"
@@ -2391,7 +2441,7 @@ function JournalPageContent() {
                     {organizedThoughts.map((thought) => (
                       <div
                         key={thought.id}
-                        className="p-4 bg-[#867979]/10 rounded-lg border border-[#867979]/20"
+                        className="p-4 bg-[#867979]/10 rounded-lg border border-[#867979]/20 overflow-hidden"
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -2427,7 +2477,13 @@ function JournalPageContent() {
                             ×
                           </button>
                         </div>
-                        <p className="text-[#D0CCCC] mb-2 whitespace-pre-wrap wrap-break-word">
+                        <p
+                          className="text-[#D0CCCC] mb-2 whitespace-pre-wrap"
+                          style={{
+                            wordBreak: "break-word",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
                           {thought.originalText}
                         </p>
                         {thought.type === "improvement" && (
@@ -2446,7 +2502,13 @@ function JournalPageContent() {
                           </div>
                         )}
                         {thought.expanded && (
-                          <p className="text-sm text-[#867979] mt-2 whitespace-pre-wrap wrap-break-word">
+                          <p
+                            className="text-sm text-[#867979] mt-2 whitespace-pre-wrap"
+                            style={{
+                              wordBreak: "break-word",
+                              overflowWrap: "anywhere",
+                            }}
+                          >
                             {thought.type === "improvement"
                               ? `Notes: ${thought.expanded}`
                               : thought.expanded}
