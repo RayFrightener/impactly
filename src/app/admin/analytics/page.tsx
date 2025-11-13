@@ -47,7 +47,10 @@ interface AdminAnalyticsData {
   recentEvents: Array<{
     id: string;
     eventType: string;
+    eventData: unknown;
     createdAt: Date;
+    duration: number | null;
+    platform: string | null;
     user: {
       name: string | null;
       email: string;
@@ -58,6 +61,34 @@ interface AdminAnalyticsData {
     _count: {
       id: number;
     };
+  }>;
+  activityTrends: Array<{
+    time: Date;
+    count: number;
+  }>;
+  heatmapData: Array<{
+    hour: number;
+    count: number;
+  }>;
+  eventFrequency: {
+    totalEvents: number;
+    eventsPerHour: number;
+    eventsPerDay: number;
+    mostCommonEventType: string;
+    peakActivityHour: number | null;
+  };
+  activeUsers: Array<{
+    userId: string;
+    eventCount: number;
+    latestAction: {
+      id: string;
+      eventType: string;
+      createdAt: Date;
+      user: {
+        name: string | null;
+        email: string;
+      };
+    } | null;
   }>;
   performance?: {
     webVitals: {
@@ -99,12 +130,30 @@ interface AdminAnalyticsData {
   };
 }
 
+type TimeRange = "hour" | "day" | "week" | "month" | "custom" | null;
+
+interface EventFilters {
+  timeRange: TimeRange;
+  eventTypes: string[];
+  userEmail: string;
+  customStartDate: string;
+  customEndDate: string;
+}
+
 export default function AdminAnalyticsPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [analytics, setAnalytics] = useState<AdminAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<EventFilters>({
+    timeRange: "day",
+    eventTypes: [],
+    userEmail: "",
+    customStartDate: "",
+    customEndDate: "",
+  });
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Check authorization
@@ -120,7 +169,36 @@ export default function AdminAnalyticsPage() {
     async function loadAnalytics() {
       try {
         setLoading(true);
-        const data = await getAdminAnalytics();
+        const filterParams: {
+          timeRange?: "hour" | "day" | "week" | "month" | "custom";
+          customStartDate?: Date;
+          customEndDate?: Date;
+          eventTypes?: string[];
+          userEmail?: string;
+        } = {};
+
+        if (filters.timeRange) {
+          filterParams.timeRange = filters.timeRange;
+        }
+
+        if (filters.timeRange === "custom") {
+          if (filters.customStartDate) {
+            filterParams.customStartDate = new Date(filters.customStartDate);
+          }
+          if (filters.customEndDate) {
+            filterParams.customEndDate = new Date(filters.customEndDate);
+          }
+        }
+
+        if (filters.eventTypes.length > 0) {
+          filterParams.eventTypes = filters.eventTypes;
+        }
+
+        if (filters.userEmail) {
+          filterParams.userEmail = filters.userEmail;
+        }
+
+        const data = await getAdminAnalytics(filterParams);
         setAnalytics(data);
       } catch (err) {
         console.error("Failed to load analytics:", err);
@@ -131,7 +209,7 @@ export default function AdminAnalyticsPage() {
     }
 
     loadAnalytics();
-  }, [session, status, router]);
+  }, [session, status, router, filters]);
 
   if (status === "loading" || loading) {
     return <LoadingScreen message="Loading analytics..." />;
@@ -632,38 +710,470 @@ User Engagement:
           </div>
         </div>
 
-        {/* Recent Events */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">
-            Recent Events
-          </h3>
-          <div className="space-y-2">
-            {analytics.recentEvents.slice(0, 20).map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center justify-between p-3 border-b border-slate-100 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">
-                    {event.eventType.includes("project") ? "📁" :
-                     event.eventType.includes("task") ? "✅" :
-                     event.eventType.includes("session") ? "🔥" :
-                     "📝"}
-                  </span>
-                  <div>
+        {/* Activity Visualizations */}
+        {analytics && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Activity Trends Chart */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Activity Trends
+              </h3>
+              <div className="h-64 flex items-end justify-between gap-1">
+                {analytics.activityTrends.length > 0 ? (
+                  analytics.activityTrends.map((point, index) => {
+                    const maxCount = Math.max(
+                      ...analytics.activityTrends.map((p) => p.count),
+                      1
+                    );
+                    const height = (point.count / maxCount) * 100;
+                    return (
+                      <div
+                        key={index}
+                        className="flex-1 bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
+                        style={{ height: `${height}%` }}
+                        title={`${new Date(point.time).toLocaleString()}: ${point.count} events`}
+                      />
+                    );
+                  })
+                ) : (
+                  <div className="w-full text-center text-slate-500 py-8">
+                    No activity data available
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Activity Heatmap */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Activity Heatmap (by Hour)
+              </h3>
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: 24 }, (_, hour) => {
+                  const data = analytics.heatmapData.find((h) => h.hour === hour);
+                  const count = data?.count || 0;
+                  const maxCount = Math.max(
+                    ...analytics.heatmapData.map((h) => h.count),
+                    1
+                  );
+                  const intensity = (count / maxCount) * 100;
+                  const bgIntensity = Math.min(intensity, 100);
+                  return (
+                    <div
+                      key={hour}
+                      className="w-[calc(4.166%-0.25rem)] aspect-square rounded min-w-[20px]"
+                      style={{
+                        backgroundColor: `rgba(59, 130, 246, ${bgIntensity / 100})`,
+                      }}
+                      title={`${hour}:00 - ${count} events`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-xs text-slate-500 text-center">
+                0:00 - 23:00 (24 hours)
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Event Frequency Metrics */}
+        {analytics && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="text-sm text-slate-600 mb-1">Total Events</div>
+              <div className="text-3xl font-bold text-slate-900">
+                {analytics.eventFrequency.totalEvents}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="text-sm text-slate-600 mb-1">Events/Hour</div>
+              <div className="text-3xl font-bold text-slate-900">
+                {analytics.eventFrequency.eventsPerHour.toFixed(1)}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="text-sm text-slate-600 mb-1">Most Common</div>
+              <div className="text-lg font-semibold text-slate-900 truncate">
+                {analytics.eventFrequency.mostCommonEventType
+                  .replace(/_/g, " ")
+                  .toLowerCase()}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="text-sm text-slate-600 mb-1">Peak Hour</div>
+              <div className="text-3xl font-bold text-slate-900">
+                {analytics.eventFrequency.peakActivityHour !== null
+                  ? `${analytics.eventFrequency.peakActivityHour}:00`
+                  : "N/A"}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Most Active Users */}
+        {analytics && analytics.activeUsers.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">
+              Most Active Users
+            </h3>
+            <div className="space-y-3">
+              {analytics.activeUsers.map((activeUser) => (
+                <div
+                  key={activeUser.userId}
+                  className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                >
+                  <div className="flex-1">
                     <p className="font-medium text-slate-900">
-                      {event.eventType.replace(/_/g, " ").toLowerCase()}
+                      {activeUser.latestAction?.user.name ||
+                        activeUser.latestAction?.user.email ||
+                        "Unknown User"}
                     </p>
                     <p className="text-sm text-slate-600">
-                      {event.user.name || event.user.email}
+                      {activeUser.eventCount} events
+                      {activeUser.latestAction && (
+                        <span className="ml-2">
+                          • Latest:{" "}
+                          {activeUser.latestAction.eventType
+                            .replace(/_/g, " ")
+                            .toLowerCase()}{" "}
+                          at{" "}
+                          {new Date(
+                            activeUser.latestAction.createdAt
+                          ).toLocaleString()}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
-                <span className="text-sm text-slate-500">
-                  {new Date(event.createdAt).toLocaleString()}
-                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Filter Controls */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Filter Events
+            </h3>
+            <button
+              onClick={() => {
+                setFilters({
+                  timeRange: "day",
+                  eventTypes: [],
+                  userEmail: "",
+                  customStartDate: "",
+                  customEndDate: "",
+                });
+              }}
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Clear All
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Time Range Filter */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Time Range
+              </label>
+              <select
+                value={filters.timeRange || ""}
+                onChange={(e) => {
+                  setFilters({
+                    ...filters,
+                    timeRange: e.target.value as TimeRange,
+                  });
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="hour">Last Hour</option>
+                <option value="day">Last 24 Hours</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+
+            {/* Custom Date Range */}
+            {filters.timeRange === "custom" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={filters.customStartDate}
+                    onChange={(e) => {
+                      setFilters({
+                        ...filters,
+                        customStartDate: e.target.value,
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={filters.customEndDate}
+                    onChange={(e) => {
+                      setFilters({
+                        ...filters,
+                        customEndDate: e.target.value,
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* User Filter */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                User Email (optional)
+              </label>
+              <input
+                type="email"
+                value={filters.userEmail}
+                onChange={(e) => {
+                  setFilters({ ...filters, userEmail: e.target.value });
+                }}
+                placeholder="Filter by user email..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Event Type Filter */}
+          {analytics && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Event Types
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {analytics.eventBreakdown.map((eventType) => (
+                  <label
+                    key={eventType.eventType}
+                    className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-lg cursor-pointer hover:bg-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filters.eventTypes.includes(eventType.eventType)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFilters({
+                            ...filters,
+                            eventTypes: [...filters.eventTypes, eventType.eventType],
+                          });
+                        } else {
+                          setFilters({
+                            ...filters,
+                            eventTypes: filters.eventTypes.filter(
+                              (t) => t !== eventType.eventType
+                            ),
+                          });
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-slate-700">
+                      {eventType.eventType.replace(/_/g, " ").toLowerCase()}
+                    </span>
+                  </label>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Active Filters Badge */}
+          {(filters.eventTypes.length > 0 ||
+            filters.userEmail ||
+            filters.timeRange) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="text-sm text-slate-600">Active filters:</span>
+              {filters.timeRange && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                  {filters.timeRange === "custom"
+                    ? "Custom Range"
+                    : `Last ${filters.timeRange}`}
+                </span>
+              )}
+              {filters.eventTypes.length > 0 && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                  {filters.eventTypes.length} event type(s)
+                </span>
+              )}
+              {filters.userEmail && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                  User: {filters.userEmail}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Events */}
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Recent Events
+            </h3>
+            {analytics && (
+              <span className="text-sm text-slate-600">
+                {analytics.recentEvents.length} events
+              </span>
+            )}
+          </div>
+          <div className="space-y-2">
+            {analytics.recentEvents.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                No events found for the selected filters
+              </div>
+            ) : (
+              analytics.recentEvents.map((event) => {
+                const isExpanded = expandedEvents.has(event.id);
+                const eventDate = new Date(event.createdAt);
+                const now = new Date();
+                const diffMs = now.getTime() - eventDate.getTime();
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                let relativeTime: string;
+                if (diffMins < 1) {
+                  relativeTime = "Just now";
+                } else if (diffMins < 60) {
+                  relativeTime = `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+                } else if (diffHours < 24) {
+                  relativeTime = `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+                } else if (diffDays < 7) {
+                  relativeTime = `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+                } else {
+                  relativeTime = eventDate.toLocaleDateString();
+                }
+
+                const getEventIcon = (eventType: string): string => {
+                  if (eventType.includes("project")) return "📁";
+                  if (eventType.includes("task")) return "✅";
+                  if (eventType.includes("session")) return "🔥";
+                  if (eventType.includes("journal")) return "📔";
+                  if (eventType.includes("feedback")) return "💬";
+                  if (eventType.includes("page")) return "🌐";
+                  return "📝";
+                };
+
+                const getEventDataPreview = (eventData: unknown): string => {
+                  if (!eventData || typeof eventData !== "object") return "";
+                  const data = eventData as Record<string, unknown>;
+                  const parts: string[] = [];
+                  if (data.projectId) parts.push(`Project: ${data.projectId}`);
+                  if (data.taskId) parts.push(`Task: ${data.taskId}`);
+                  if (data.page) parts.push(`Page: ${data.page}`);
+                  if (data.metricName) parts.push(`Metric: ${data.metricName}`);
+                  return parts.join(", ");
+                };
+
+                return (
+                  <div
+                    key={event.id}
+                    className="border-b border-slate-100 last:border-0"
+                  >
+                    <div
+                      className="flex items-center justify-between p-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        const newExpanded = new Set(expandedEvents);
+                        if (isExpanded) {
+                          newExpanded.delete(event.id);
+                        } else {
+                          newExpanded.add(event.id);
+                        }
+                        setExpandedEvents(newExpanded);
+                      }}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="text-2xl">{getEventIcon(event.eventType)}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-900">
+                              {event.eventType.replace(/_/g, " ").toLowerCase()}
+                            </p>
+                            {getEventDataPreview(event.eventData) && (
+                              <span className="text-xs text-slate-500">
+                                ({getEventDataPreview(event.eventData)})
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-sm text-slate-600">
+                              {event.user.name || event.user.email}
+                            </p>
+                            {event.platform && (
+                              <span className="text-xs text-slate-400">
+                                • {event.platform}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-slate-900">
+                            {relativeTime}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {eventDate.toLocaleString()}
+                          </p>
+                        </div>
+                        <button className="text-slate-400 hover:text-slate-600">
+                          {isExpanded ? "▼" : "▶"}
+                        </button>
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="px-3 pb-3 bg-slate-50 border-t border-slate-100">
+                        <div className="pt-3 space-y-2">
+                          <div>
+                            <span className="text-xs font-semibold text-slate-600">
+                              Event ID:
+                            </span>{" "}
+                            <span className="text-xs text-slate-700 font-mono">
+                              {event.id}
+                            </span>
+                          </div>
+                          {event.duration !== null && (
+                            <div>
+                              <span className="text-xs font-semibold text-slate-600">
+                                Duration:
+                              </span>{" "}
+                              <span className="text-xs text-slate-700">
+                                {event.duration}ms
+                              </span>
+                            </div>
+                          )}
+                          {event.eventData != null && (
+                            <div>
+                              <span className="text-xs font-semibold text-slate-600">
+                                Event Data:
+                              </span>
+                              <pre className="text-xs text-slate-700 mt-1 p-2 bg-white rounded border border-slate-200 overflow-x-auto">
+                                {JSON.stringify(event.eventData, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

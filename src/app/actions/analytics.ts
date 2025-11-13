@@ -54,11 +54,71 @@ export async function getUserMetrics() {
   return metrics;
 }
 
+interface AnalyticsFilters {
+  timeRange?: "hour" | "day" | "week" | "month" | "custom";
+  customStartDate?: Date;
+  customEndDate?: Date;
+  eventTypes?: string[];
+  userId?: string;
+  userEmail?: string;
+  limit?: number;
+  offset?: number;
+}
+
 /**
  * Get admin analytics (protected - only for admin email)
  */
-export async function getAdminAnalytics() {
+export async function getAdminAnalytics(filters?: AnalyticsFilters) {
   await requireAdmin();
+
+  // Calculate time range for filters
+  const now = new Date();
+  let startDate: Date | undefined;
+  
+  if (filters?.timeRange === "hour") {
+    startDate = new Date(now.getTime() - 60 * 60 * 1000);
+  } else if (filters?.timeRange === "day") {
+    startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  } else if (filters?.timeRange === "week") {
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  } else if (filters?.timeRange === "month") {
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (filters?.timeRange === "custom" && filters.customStartDate) {
+    startDate = filters.customStartDate;
+  }
+
+  const endDate = filters?.customEndDate || now;
+
+  // Build event query filters
+  const eventWhere: {
+    createdAt?: { gte?: Date; lte?: Date };
+    eventType?: { in?: string[] };
+    userId?: string;
+  } = {};
+
+  if (startDate) {
+    eventWhere.createdAt = { gte: startDate, lte: endDate };
+  }
+
+  if (filters?.eventTypes && filters.eventTypes.length > 0) {
+    eventWhere.eventType = { in: filters.eventTypes };
+  }
+
+  if (filters?.userId) {
+    eventWhere.userId = filters.userId;
+  } else if (filters?.userEmail) {
+    // Need to find user ID from email first
+    const user = await prisma.user.findUnique({
+      where: { email: filters.userEmail },
+      select: { id: true },
+    });
+    if (user) {
+      eventWhere.userId = user.id;
+    } else {
+      // User not found, return empty results
+      eventWhere.userId = "non-existent-user-id";
+    }
+  }
 
   // Get all metrics
   const [
@@ -97,11 +157,19 @@ export async function getAdminAnalytics() {
       },
     }),
     prisma.analytics.findMany({
-      take: 100,
+      where: eventWhere,
+      take: filters?.limit || 100,
+      skip: filters?.offset || 0,
       orderBy: {
         createdAt: "desc",
       },
-      include: {
+      select: {
+        id: true,
+        eventType: true,
+        eventData: true,
+        createdAt: true,
+        duration: true,
+        platform: true,
         user: {
           select: {
             name: true,
@@ -132,7 +200,6 @@ export async function getAdminAnalytics() {
     : 0;
 
   // Get DAU, WAU, MAU
-  const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -184,6 +251,127 @@ export async function getAdminAnalytics() {
       },
     },
   });
+
+  // Get activity trends data (grouped by hour/day)
+  // Fetch all events and group them in memory by time bucket
+  const allEventsForTrends = await prisma.analytics.findMany({
+    where: startDate ? {
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+      ...(filters?.eventTypes && filters.eventTypes.length > 0
+        ? { eventType: { in: filters.eventTypes } }
+        : {}),
+      ...(filters?.userId ? { userId: filters.userId } : {}),
+    } : {},
+    select: {
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  // Group events by hour for trends
+  const trendsByHour: Record<string, number> = {};
+  allEventsForTrends.forEach((event) => {
+    const date = new Date(event.createdAt);
+    // Round to nearest hour
+    date.setMinutes(0, 0, 0);
+    const key = date.toISOString();
+    trendsByHour[key] = (trendsByHour[key] || 0) + 1;
+  });
+
+  const trendsData = Object.entries(trendsByHour).map(([time, count]) => ({
+    time: new Date(time),
+    count,
+  }));
+
+  // Get heatmap data (events by hour of day)
+  const allEventsForHeatmap = await prisma.analytics.findMany({
+    where: startDate ? {
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+      ...(filters?.eventTypes && filters.eventTypes.length > 0
+        ? { eventType: { in: filters.eventTypes } }
+        : {}),
+      ...(filters?.userId ? { userId: filters.userId } : {}),
+    } : {},
+    select: {
+      createdAt: true,
+    },
+  });
+
+  // Process heatmap data: group by hour of day (0-23)
+  const heatmapData: Record<number, number> = {};
+  for (let hour = 0; hour < 24; hour++) {
+    heatmapData[hour] = 0;
+  }
+  allEventsForHeatmap.forEach((event) => {
+    const hour = new Date(event.createdAt).getHours();
+    heatmapData[hour] = (heatmapData[hour] || 0) + 1;
+  });
+
+  // Get most active users in the filtered period
+  const activeUsersData = await prisma.analytics.groupBy({
+    by: ["userId"],
+    where: startDate ? {
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+      ...(filters?.eventTypes && filters.eventTypes.length > 0
+        ? { eventType: { in: filters.eventTypes } }
+        : {}),
+    } : {},
+    _count: {
+      id: true,
+    },
+    orderBy: {
+      _count: {
+        id: "desc",
+      },
+    },
+    take: 10,
+  });
+
+  // Get latest action for each active user
+  const activeUserIds = activeUsersData.map((u) => u.userId);
+  const latestActions = await Promise.all(
+    activeUserIds.map(async (userId) => {
+      const latest = await prisma.analytics.findFirst({
+        where: {
+          userId,
+          ...(startDate
+            ? {
+                createdAt: {
+                  gte: startDate,
+                  lte: endDate,
+                },
+              }
+            : {}),
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+          eventType: true,
+          createdAt: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+      return latest;
+    })
+  );
 
   // Performance metrics aggregation
   const performanceEvents = await prisma.analytics.findMany({
@@ -279,6 +467,34 @@ export async function getAdminAnalytics() {
     .sort((a, b) => b.avgLoadTime - a.avgLoadTime)
     .slice(0, 10);
 
+  // Calculate event frequency metrics
+  const totalEventsInPeriod = recentEvents.length;
+  const hoursInPeriod = startDate
+    ? Math.max(1, (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60))
+    : 24;
+  const eventsPerHour = totalEventsInPeriod / hoursInPeriod;
+  const eventsPerDay = eventsPerHour * 24;
+
+  // Find most common event type in period
+  const eventTypeCounts = recentEvents.reduce(
+    (acc, event) => {
+      acc[event.eventType] = (acc[event.eventType] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+  const mostCommonEventType = Object.entries(eventTypeCounts).sort(
+    (a, b) => b[1] - a[1]
+  )[0]?.[0] || "N/A";
+
+  // Find peak activity hour
+  const peakHour = Object.entries(heatmapData).sort(
+    (a, b) => b[1] - a[1]
+  )[0]?.[0];
+
+  // Process trends data into time series (already processed above)
+  const timeSeriesData = trendsData;
+
   return {
     overview: {
       totalUsers,
@@ -337,6 +553,24 @@ export async function getAdminAnalytics() {
     recentEvents,
     userGrowth,
     eventBreakdown,
+    // New analytics data
+    activityTrends: timeSeriesData,
+    heatmapData: Object.entries(heatmapData).map(([hour, count]) => ({
+      hour: Number.parseInt(hour, 10),
+      count,
+    })),
+    eventFrequency: {
+      totalEvents: totalEventsInPeriod,
+      eventsPerHour: Math.round(eventsPerHour * 100) / 100,
+      eventsPerDay: Math.round(eventsPerDay * 100) / 100,
+      mostCommonEventType,
+      peakActivityHour: peakHour ? Number.parseInt(peakHour, 10) : null,
+    },
+    activeUsers: activeUsersData.map((userData, index) => ({
+      userId: userData.userId,
+      eventCount: userData._count.id,
+      latestAction: latestActions[index] || null,
+    })),
   };
 }
 

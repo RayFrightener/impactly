@@ -366,24 +366,36 @@ export default function JournalShowcase() {
       ref={containerRef}
       className="journal-showcase bg-[#171717] rounded-2xl border border-[#D0CCCC]/30 shadow-sm overflow-hidden relative"
     >
-      {/* Project Selector */}
+      {/* Project Selector - Tabs */}
       {projects.length > 0 && (
         <div className="px-8 pt-6 pb-4 border-b border-[#D0CCCC]/30">
-          <label className="block text-sm text-[#D0CCCC] mb-2">
-            Select Project
-          </label>
-          <select
-            value={selectedProjectId || ""}
-            onChange={(e) => setSelectedProjectId(e.target.value || null)}
-            className="bg-[#171717] border border-[#D0CCCC]/30 rounded-lg px-4 py-2 text-[#D0CCCC] focus:outline-none focus:border-[#D0CCCC] text-sm"
-          >
-            <option value="">Home</option>
+          <div className="flex gap-2 overflow-x-auto">
+            {/* Home Tab */}
+            <button
+              onClick={() => setSelectedProjectId(null)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+                selectedProjectId === null
+                  ? "bg-[#D0CCCC] text-[#171717] font-semibold border-2 border-[#D0CCCC] shadow-md"
+                  : "bg-[#867979]/40 text-[#D0CCCC] hover:bg-[#867979]/50 border border-[#D0CCCC]/50"
+              }`}
+            >
+              Home
+            </button>
+            {/* Project Tabs */}
             {projects.map((project) => (
-              <option key={project.id} value={project.id}>
+              <button
+                key={project.id}
+                onClick={() => setSelectedProjectId(project.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+                  selectedProjectId === project.id
+                    ? "bg-[#D0CCCC] text-[#171717] font-semibold border-2 border-[#D0CCCC] shadow-md"
+                    : "bg-[#867979]/40 text-[#D0CCCC] hover:bg-[#867979]/50 border border-[#D0CCCC]/50"
+                }`}
+              >
                 {project.name}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
       )}
 

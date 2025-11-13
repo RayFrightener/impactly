@@ -208,32 +208,36 @@ function DashboardContent() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-neutral-50 to-purple-50 p-8">
+      <div className="min-h-screen bg-background p-8">
         <div className="max-w-7xl mx-auto">
           {/* Top Navigation Bar */}
           <div className="flex gap-3 items-center mb-8">
             {/* Left Navigation */}
             <button
               onClick={() => router.push("/roadmap")}
-              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              className="px-4 py-2 bg-button rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              style={{ color: "#ffffff" }}
             >
               🗺️ Roadmap
             </button>
             <button
               onClick={() => router.push("/dashboard/insights")}
-              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              className="px-4 py-2 bg-button rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              style={{ color: "#ffffff" }}
             >
               📊 View Insights
             </button>
             <button
               onClick={() => router.push("/journal")}
-              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              className="px-4 py-2 bg-button rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              style={{ color: "#ffffff" }}
             >
               ✍️ Journal
             </button>
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              className="px-4 py-2 bg-button rounded-lg hover:opacity-90 transition font-medium shadow-sm"
+              style={{ color: "#ffffff" }}
             >
               ⚙️ Settings
             </button>
@@ -242,18 +246,24 @@ function DashboardContent() {
           {/* Welcome Section */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-3">
-              <h1 className="text-5xl font-light text-gray-900">
+              <h1 className="text-5xl font-light text-text-primary">
                 Welcome Back{firstName ? `, ${firstName}` : ""}
               </h1>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-button text-button-text px-10 py-4 rounded-2xl hover:opacity-90 transition-all duration-200 font-bold text-xl flex items-center gap-4 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-100 transform"
+                className="bg-button px-10 py-4 rounded-2xl hover:opacity-90 transition-all duration-200 font-bold text-xl flex items-center gap-4 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-100 transform"
+                style={{ color: "#ffffff" }}
               >
-                <span className="text-3xl font-light">+</span>
+                <span
+                  className="text-3xl font-light"
+                  style={{ color: "#ffffff" }}
+                >
+                  +
+                </span>
                 Create New Project
               </button>
             </div>
-            <p className="text-gray-600 text-xl leading-relaxed">
+            <p className="text-text-secondary text-xl leading-relaxed">
               Your projects and thoughts, all in one place
             </p>
           </div>
@@ -263,7 +273,9 @@ function DashboardContent() {
           ) : error ? (
             <div className="text-center py-32">
               <div className="text-6xl mb-6">⚠️</div>
-              <p className="text-2xl text-red-600 mb-6 font-light">{error}</p>
+              <p className="text-2xl text-text-primary mb-6 font-light">
+                {error}
+              </p>
               <button
                 onClick={() => window.location.reload()}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
@@ -276,10 +288,10 @@ function DashboardContent() {
               {activeProjects.length === 0 ? (
                 <div className="text-center py-32">
                   <div className="text-7xl mb-6">📝</div>
-                  <h2 className="text-3xl font-light text-gray-900 mb-3">
+                  <h2 className="text-3xl font-light text-text-primary mb-3">
                     No projects yet
                   </h2>
-                  <p className="text-neutral-800/70 mb-6">
+                  <p className="text-text-secondary mb-6">
                     Create your first project to get started
                   </p>
                   <button
@@ -336,20 +348,48 @@ function DashboardContent() {
                       >
                         <button
                           onClick={() => setSelectedProject(project.id)}
-                          className="w-full bg-surface rounded-2xl p-6 hover:bg-surface-alt transition-all shadow-sm hover:shadow-md text-left border border-border group"
+                          className="w-full rounded-2xl p-6 transition-all shadow-sm hover:shadow-md text-left border group"
+                          style={{
+                            backgroundColor: "var(--theme-button)",
+                            color: "var(--theme-button-text)",
+                            borderColor: "var(--theme-border)",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "0.9";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                          }}
                         >
                           {/* Header with Status */}
                           <div className="flex justify-between items-start mb-3">
-                            <h3 className="text-xl font-semibold text-text-primary group-hover:opacity-90 transition flex-1">
+                            <h3
+                              className="text-xl font-semibold group-hover:opacity-90 transition flex-1"
+                              style={{ color: "var(--theme-button-text)" }}
+                            >
                               {project.name}
                             </h3>
                             <div className="flex flex-col items-end gap-1">
-                              <span className="text-xs px-2 py-1 bg-button group-hover:opacity-90 text-button-text rounded-full capitalize transition-colors font-medium">
+                              <span
+                                className="text-xs px-2 py-1 rounded-full capitalize transition-colors font-medium"
+                                style={{
+                                  backgroundColor: "var(--theme-accent)",
+                                  color: "var(--theme-accent-contrast)",
+                                }}
+                              >
                                 {project.status}
                               </span>
                               {stats.hasActivity &&
                                 project.status !== "ACTIVE" && (
-                                  <span className="text-xs px-2 py-0.5 bg-surface-alt group-hover:opacity-80 text-text-primary rounded-full transition-colors">
+                                  <span
+                                    className="text-xs px-2 py-0.5 rounded-full transition-colors"
+                                    style={{
+                                      backgroundColor:
+                                        "var(--theme-surface-alt)",
+                                      color: "var(--theme-button-text)",
+                                      opacity: 0.8,
+                                    }}
+                                  >
                                     Recent Activity
                                   </span>
                                 )}
@@ -358,7 +398,13 @@ function DashboardContent() {
 
                           {/* Description */}
                           {project.description && (
-                            <p className="text-text-secondary text-sm mb-4 line-clamp-2">
+                            <p
+                              className="text-sm mb-4 line-clamp-2"
+                              style={{
+                                color: "var(--theme-button-text)",
+                                opacity: 0.9,
+                              }}
+                            >
                               {project.description}
                             </p>
                           )}
@@ -367,7 +413,10 @@ function DashboardContent() {
                           <div className="mb-4 space-y-3">
                             {/* Overall Progress */}
                             <div>
-                              <div className="flex justify-between text-xs text-text-primary mb-1">
+                              <div
+                                className="flex justify-between text-xs mb-1"
+                                style={{ color: "var(--theme-button-text)" }}
+                              >
                                 <span className="font-medium">
                                   Overall Progress
                                 </span>
@@ -375,10 +424,19 @@ function DashboardContent() {
                                   {progress}%
                                 </span>
                               </div>
-                              <div className="w-full bg-surface-alt group-hover:opacity-80 rounded-full h-2.5 transition-colors">
+                              <div
+                                className="w-full rounded-full h-2.5 transition-colors"
+                                style={{
+                                  backgroundColor: "var(--theme-surface-alt)",
+                                  opacity: 0.3,
+                                }}
+                              >
                                 <div
-                                  className="bg-progress group-hover:opacity-90 h-2.5 rounded-full transition-all"
-                                  style={{ width: `${progress}%` }}
+                                  className="h-2.5 rounded-full transition-all"
+                                  style={{
+                                    width: `${progress}%`,
+                                    backgroundColor: "var(--theme-progress)",
+                                  }}
                                 />
                               </div>
                             </div>
@@ -386,27 +444,69 @@ function DashboardContent() {
                             {/* Tasks Breakdown */}
                             {stats.totalTasks > 0 && (
                               <div className="grid grid-cols-3 gap-2 text-xs">
-                                <div className="bg-surface-alt group-hover:opacity-80 rounded-lg p-2 text-center transition-colors">
-                                  <div className="font-semibold text-text-primary">
+                                <div
+                                  className="rounded-lg p-2 text-center transition-colors"
+                                  style={{
+                                    backgroundColor: "rgba(0, 0, 0, 0.15)",
+                                    border:
+                                      "1px solid rgba(255, 255, 255, 0.1)",
+                                  }}
+                                >
+                                  <div
+                                    className="font-semibold"
+                                    style={{ color: "#ffffff" }}
+                                  >
                                     {stats.completedTasks}
                                   </div>
-                                  <div className="text-text-secondary">
+                                  <div
+                                    style={{
+                                      color: "#ffffff",
+                                    }}
+                                  >
                                     Done
                                   </div>
                                 </div>
-                                <div className="bg-surface-alt group-hover:opacity-80 rounded-lg p-2 text-center transition-colors">
-                                  <div className="font-semibold text-text-primary">
+                                <div
+                                  className="rounded-lg p-2 text-center transition-colors"
+                                  style={{
+                                    backgroundColor: "rgba(0, 0, 0, 0.15)",
+                                    border:
+                                      "1px solid rgba(255, 255, 255, 0.1)",
+                                  }}
+                                >
+                                  <div
+                                    className="font-semibold"
+                                    style={{ color: "#ffffff" }}
+                                  >
                                     {stats.inProgressTasks}
                                   </div>
-                                  <div className="text-text-secondary">
+                                  <div
+                                    style={{
+                                      color: "#ffffff",
+                                    }}
+                                  >
                                     Active
                                   </div>
                                 </div>
-                                <div className="bg-surface-alt group-hover:opacity-80 rounded-lg p-2 text-center transition-colors">
-                                  <div className="font-semibold text-text-primary">
+                                <div
+                                  className="rounded-lg p-2 text-center transition-colors"
+                                  style={{
+                                    backgroundColor: "rgba(0, 0, 0, 0.15)",
+                                    border:
+                                      "1px solid rgba(255, 255, 255, 0.1)",
+                                  }}
+                                >
+                                  <div
+                                    className="font-semibold"
+                                    style={{ color: "#ffffff" }}
+                                  >
                                     {stats.todoTasks}
                                   </div>
-                                  <div className="text-text-secondary">
+                                  <div
+                                    style={{
+                                      color: "#ffffff",
+                                    }}
+                                  >
                                     Todo
                                   </div>
                                 </div>
@@ -417,16 +517,33 @@ function DashboardContent() {
                             {stats.totalFeatures > 0 && (
                               <div className="flex items-center justify-between text-xs">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-text-primary">
+                                  <span
+                                    style={{
+                                      color: "var(--theme-button-text)",
+                                    }}
+                                  >
                                     Features:
                                   </span>
-                                  <span className="font-semibold text-text-primary">
+                                  <span
+                                    className="font-semibold"
+                                    style={{
+                                      color: "var(--theme-button-text)",
+                                    }}
+                                  >
                                     {stats.completedFeatures}/
                                     {stats.totalFeatures} completed
                                   </span>
                                 </div>
                                 {stats.inProgressFeatures > 0 && (
-                                  <span className="px-2 py-1 bg-surface-alt group-hover:opacity-80 text-text-primary rounded-full transition-colors">
+                                  <span
+                                    className="px-2 py-1 rounded-full transition-colors"
+                                    style={{
+                                      backgroundColor: "rgba(0, 0, 0, 0.2)",
+                                      color: "#ffffff",
+                                      border:
+                                        "1px solid rgba(255, 255, 255, 0.15)",
+                                    }}
+                                  >
                                     {stats.inProgressFeatures} in progress
                                   </span>
                                 )}
@@ -436,17 +553,37 @@ function DashboardContent() {
 
                           {/* Current Focus / Next Steps */}
                           {(stats.currentFeature || stats.nextFeature) && (
-                            <div className="mb-4 pt-4 border-t border-border group-hover:opacity-80 transition-colors">
+                            <div
+                              className="mb-4 pt-4 border-t transition-colors"
+                              style={{
+                                borderColor: "var(--theme-border)",
+                                opacity: 0.5,
+                              }}
+                            >
                               {stats.currentFeature && (
                                 <div className="flex items-start gap-2 mb-2">
-                                  <span className="text-accent text-xs mt-0.5">
+                                  <span
+                                    className="text-xs mt-0.5"
+                                    style={{ color: "var(--theme-accent)" }}
+                                  >
                                     ⚡
                                   </span>
                                   <div className="flex-1">
-                                    <div className="text-xs text-text-primary font-medium mb-0.5">
+                                    <div
+                                      className="text-xs font-medium mb-0.5"
+                                      style={{
+                                        color: "var(--theme-button-text)",
+                                        opacity: 0.9,
+                                      }}
+                                    >
                                       Currently Working On:
                                     </div>
-                                    <div className="text-sm text-text-primary font-medium">
+                                    <div
+                                      className="text-sm font-medium"
+                                      style={{
+                                        color: "var(--theme-button-text)",
+                                      }}
+                                    >
                                       {stats.currentFeature}
                                     </div>
                                   </div>
@@ -454,14 +591,28 @@ function DashboardContent() {
                               )}
                               {stats.nextFeature && !stats.currentFeature && (
                                 <div className="flex items-start gap-2">
-                                  <span className="text-accent text-xs mt-0.5">
+                                  <span
+                                    className="text-xs mt-0.5"
+                                    style={{ color: "var(--theme-accent)" }}
+                                  >
                                     📋
                                   </span>
                                   <div className="flex-1">
-                                    <div className="text-xs text-text-primary font-medium mb-0.5">
+                                    <div
+                                      className="text-xs font-medium mb-0.5"
+                                      style={{
+                                        color: "var(--theme-button-text)",
+                                        opacity: 0.9,
+                                      }}
+                                    >
                                       Next Up:
                                     </div>
-                                    <div className="text-sm text-text-primary font-medium">
+                                    <div
+                                      className="text-sm font-medium"
+                                      style={{
+                                        color: "var(--theme-button-text)",
+                                      }}
+                                    >
                                       {stats.nextFeature}
                                     </div>
                                   </div>
@@ -471,8 +622,20 @@ function DashboardContent() {
                           )}
 
                           {/* Footer with Metadata */}
-                          <div className="flex items-center justify-between text-xs text-text-primary pt-3 border-t border-border group-hover:opacity-80 transition-colors">
-                            <div className="flex gap-3">
+                          <div
+                            className="flex items-center justify-between text-xs pt-3 border-t transition-colors"
+                            style={{
+                              borderColor: "var(--theme-border)",
+                              opacity: 0.5,
+                            }}
+                          >
+                            <div
+                              className="flex gap-3"
+                              style={{
+                                color: "var(--theme-button-text)",
+                                opacity: 0.9,
+                              }}
+                            >
                               {stats.totalTasks > 0 && (
                                 <span>{stats.totalTasks} tasks</span>
                               )}
@@ -481,7 +644,12 @@ function DashboardContent() {
                               )}
                             </div>
                             <div className="flex flex-col items-end">
-                              <span>
+                              <span
+                                style={{
+                                  color: "var(--theme-button-text)",
+                                  opacity: 0.9,
+                                }}
+                              >
                                 {stats.daysSinceUpdate === 0
                                   ? "Updated today"
                                   : stats.daysSinceUpdate === 1
@@ -489,7 +657,10 @@ function DashboardContent() {
                                   : `Updated ${stats.daysSinceUpdate}d ago`}
                               </span>
                               {stats.daysSinceUpdate > 7 && (
-                                <span className="text-accent text-[10px] mt-0.5">
+                                <span
+                                  className="text-[10px] mt-0.5"
+                                  style={{ color: "var(--theme-accent)" }}
+                                >
                                   Needs attention
                                 </span>
                               )}
@@ -591,7 +762,8 @@ function DashboardContent() {
                         <button
                           onClick={handleCreateProject}
                           disabled={!projectName.trim()}
-                          className="flex-1 px-6 py-3 bg-button text-button-text rounded-xl hover:opacity-90 transition shadow-md hover:shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 px-6 py-3 bg-button rounded-xl hover:opacity-90 transition shadow-md hover:shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ color: "#ffffff" }}
                         >
                           Create Project
                         </button>
