@@ -17,11 +17,13 @@ export default function LandingJournalDemo() {
   const [thoughts, setThoughts] = useState<Thought[]>([
     {
       id: "demo-1",
-      content: "I need to improve the user onboarding flow. The current process is too complex and users are dropping off.",
+      content:
+        "I need to improve the user onboarding flow. The current process is too complex and users are dropping off.",
     },
     {
       id: "demo-2",
-      content: "Consider adding a tutorial or interactive guide for first-time users.",
+      content:
+        "Consider adding a tutorial or interactive guide for first-time users.",
     },
   ]);
   const [editingThoughtId, setEditingThoughtId] = useState<string | null>(null);
@@ -29,14 +31,52 @@ export default function LandingJournalDemo() {
   const [selectedText, setSelectedText] = useState<string>("");
   const [extractedText, setExtractedText] = useState<string>(""); // Store text for modal
   const [showExtractModal, setShowExtractModal] = useState(false);
-  const [extractType, setExtractType] = useState<"action-item" | "requirement" | "feature" | "improvement">("action-item");
-  const [selectionPosition, setSelectionPosition] = useState<{ top: number; left: number } | null>(null);
+  const [extractType, setExtractType] = useState<
+    "action-item" | "requirement" | "feature" | "improvement"
+  >("action-item");
+  const [selectionPosition, setSelectionPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle text selection
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Helper function to check if a node is within a thought content div
+    const isInThoughtDiv = (node: Node | null): boolean => {
+      if (!node) return false;
+
+      // Get the element (either the node itself or its parent if it's a text node)
+      let element: Element | null = null;
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        element = node as Element;
+      } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
+        element = node.parentElement;
+      }
+
+      if (!element) return false;
+
+      // Traverse up the DOM tree to find a thought content div
+      // Thought content divs have the class "select-text" along with "font-mono" and "whitespace-pre-wrap"
+      let current: Element | null = element;
+      while (current) {
+        // Check for the key identifying classes of thought content divs
+        if (
+          current.classList.contains("select-text") &&
+          current.classList.contains("font-mono") &&
+          current.classList.contains("whitespace-pre-wrap")
+        ) {
+          return true;
+        }
+        current = current.parentElement;
+      }
+
+      return false;
+    };
 
     const handleSelection = () => {
       const selection = window.getSelection();
@@ -46,8 +86,49 @@ export default function LandingJournalDemo() {
         return;
       }
 
+      const range = selection.getRangeAt(0);
       const selectedTextContent = selection.toString().trim();
+
       if (selectedTextContent.length === 0) {
+        setSelectedText("");
+        setSelectionPosition(null);
+        return;
+      }
+
+      // Check if selection is within a thought content div
+      const isInThought =
+        isInThoughtDiv(range.startContainer) ||
+        isInThoughtDiv(range.endContainer) ||
+        isInThoughtDiv(selection.anchorNode) ||
+        isInThoughtDiv(selection.focusNode);
+
+      // Check if selection is within textarea
+      // For textarea, check if the active element is the textarea
+      // or if any selection nodes are within the textarea
+      let isInTextarea = false;
+      if (textareaRef.current) {
+        // Check if textarea is focused (most reliable for textarea selections)
+        if (document.activeElement === textareaRef.current) {
+          isInTextarea = true;
+        }
+        // Also check if selection nodes are within textarea
+        const startContainer = range.startContainer;
+        const endContainer = range.endContainer;
+
+        if (
+          textareaRef.current.contains(startContainer) ||
+          textareaRef.current.contains(endContainer) ||
+          (selection.anchorNode &&
+            textareaRef.current.contains(selection.anchorNode)) ||
+          (selection.focusNode &&
+            textareaRef.current.contains(selection.focusNode))
+        ) {
+          isInTextarea = true;
+        }
+      }
+
+      // Only proceed if selection is in allowed areas (thought divs or textarea)
+      if (!isInTextarea && !isInThought) {
         setSelectedText("");
         setSelectionPosition(null);
         return;
@@ -56,7 +137,6 @@ export default function LandingJournalDemo() {
       setSelectedText(selectedTextContent);
 
       // Get position for quick actions menu (using viewport coordinates for fixed positioning)
-      const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       setSelectionPosition({
         top: rect.bottom + window.scrollY + 10,
@@ -65,12 +145,13 @@ export default function LandingJournalDemo() {
     };
 
     document.addEventListener("selectionchange", handleSelection);
-    return () => document.removeEventListener("selectionchange", handleSelection);
+    return () =>
+      document.removeEventListener("selectionchange", handleSelection);
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const content = currentThoughtContent.trim();
-    
+
     // Shift+Enter: Commit thought
     if (e.key === "Enter" && e.shiftKey && content.length > 0) {
       e.preventDefault();
@@ -101,7 +182,9 @@ export default function LandingJournalDemo() {
     setThoughts((prev) => prev.filter((t) => t.id !== thoughtId));
   };
 
-  const handleExtractClick = (type: "action-item" | "requirement" | "feature" | "improvement") => {
+  const handleExtractClick = (
+    type: "action-item" | "requirement" | "feature" | "improvement"
+  ) => {
     if (selectedText) {
       setExtractedText(selectedText);
       setExtractType(type);
@@ -112,13 +195,14 @@ export default function LandingJournalDemo() {
     }
   };
 
-  const placeholder = thoughts.length === 0 && currentThoughtContent === ""
-    ? "Start typing your thoughts... Press Shift+Enter to commit a thought"
-    : "";
+  const placeholder =
+    thoughts.length === 0 && currentThoughtContent === ""
+      ? "Start typing your thoughts... Press Shift+Enter to commit a thought"
+      : "";
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <div 
+      <div
         ref={containerRef}
         className="rounded-2xl border overflow-hidden shadow-lg relative"
         style={{
@@ -127,17 +211,14 @@ export default function LandingJournalDemo() {
         }}
       >
         {/* Header */}
-        <div 
-          className="px-6 py-4 border-b"
-          style={{ borderColor: "#867979" }}
-        >
+        <div className="px-6 py-4 border-b" style={{ borderColor: "#867979" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div 
+              <div
                 className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: "#867979" }}
               />
-              <span 
+              <span
                 className="text-sm font-medium"
                 style={{ color: "#D0CCCC" }}
               >
@@ -145,9 +226,9 @@ export default function LandingJournalDemo() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div 
+              <div
                 className="text-xs px-3 py-1 rounded-lg"
-                style={{ 
+                style={{
                   backgroundColor: "#867979",
                   color: "#ffffff",
                 }}
@@ -159,9 +240,9 @@ export default function LandingJournalDemo() {
         </div>
 
         {/* Main Content Area */}
-        <div 
+        <div
           className="px-8 py-12 flex flex-col overflow-hidden"
-          style={{ 
+          style={{
             backgroundColor: "#171717",
             minHeight: "400px",
             maxHeight: "600px",
@@ -176,158 +257,165 @@ export default function LandingJournalDemo() {
               }}
             >
               {/* Spacer to push content to bottom when there are few thoughts */}
-              {thoughts.length < 5 && (
-                <div className="flex-1 min-h-[100px]" />
-              )}
+              {thoughts.length < 5 && <div className="flex-1 min-h-[100px]" />}
 
               <div className="space-y-3">
                 {/* Committed Thoughts */}
                 {thoughts.map((thought) => (
-              <div
-                key={thought.id}
-                className="group relative p-4 rounded-lg transition-all duration-300 overflow-hidden"
-                style={{
-                  backgroundColor: "rgba(134, 121, 121, 0.1)",
-                  border: "1px solid rgba(134, 121, 121, 0.3)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(134, 121, 121, 0.2)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(134, 121, 121, 0.1)";
-                }}
-              >
-                {editingThoughtId === thought.id ? (
-                  <div className="space-y-2">
-                    <textarea
-                      ref={editingTextareaRef}
-                      value={editingThoughtText}
-                      onChange={(e) => setEditingThoughtText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && e.shiftKey) {
-                          e.preventDefault();
-                          handleSaveEditedThought(thought.id);
-                        } else if (e.key === "Escape") {
-                          setEditingThoughtId(null);
-                          setEditingThoughtText("");
-                        }
-                      }}
-                      className="w-full rounded p-2 font-mono text-lg leading-relaxed resize-none focus:outline-none"
-                      style={{
-                        backgroundColor: "#171717",
-                        border: "1px solid #867979",
-                        color: "#D0CCCC",
-                      }}
-                      rows={Math.max(3, editingThoughtText.split("\n").length)}
-                      autoFocus
-                    />
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs" style={{ color: "#867979" }}>
-                        Shift+Enter to save
+                  <div
+                    key={thought.id}
+                    className="group relative p-4 rounded-lg transition-all duration-300 overflow-hidden"
+                    style={{
+                      backgroundColor: "rgba(134, 121, 121, 0.1)",
+                      border: "1px solid rgba(134, 121, 121, 0.3)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        "rgba(134, 121, 121, 0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        "rgba(134, 121, 121, 0.1)";
+                    }}
+                  >
+                    {editingThoughtId === thought.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          ref={editingTextareaRef}
+                          value={editingThoughtText}
+                          onChange={(e) =>
+                            setEditingThoughtText(e.target.value)
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && e.shiftKey) {
+                              e.preventDefault();
+                              handleSaveEditedThought(thought.id);
+                            } else if (e.key === "Escape") {
+                              setEditingThoughtId(null);
+                              setEditingThoughtText("");
+                            }
+                          }}
+                          className="w-full rounded p-2 font-mono text-lg leading-relaxed resize-none focus:outline-none"
+                          style={{
+                            backgroundColor: "#171717",
+                            border: "1px solid #867979",
+                            color: "#D0CCCC",
+                          }}
+                          rows={Math.max(
+                            3,
+                            editingThoughtText.split("\n").length
+                          )}
+                          autoFocus
+                        />
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs" style={{ color: "#867979" }}>
+                            Shift+Enter to save
+                          </div>
+                          <button
+                            onClick={() => handleSaveEditedThought(thought.id)}
+                            className="px-3 py-1 text-xs rounded text-white transition"
+                            style={{
+                              backgroundColor: "#867979",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = "#756868";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = "#867979";
+                            }}
+                          >
+                            Save
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleSaveEditedThought(thought.id)}
-                        className="px-3 py-1 text-xs rounded text-white transition"
-                        style={{
-                          backgroundColor: "#867979",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#756868";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "#867979";
-                        }}
-                      >
-                        Save
-                      </button>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start gap-2">
+                          {/* Drag handle */}
+                          <div
+                            className="shrink-0 pt-1 cursor-grab"
+                            style={{ color: "#867979" }}
+                            title="Drag to reorder"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 8h16M4 16h16"
+                              />
+                            </svg>
+                          </div>
+                          {/* Thought content */}
+                          <div
+                            className="flex-1 font-mono leading-relaxed whitespace-pre-wrap select-text"
+                            style={{
+                              color: "#D0CCCC",
+                              fontSize: "18px",
+                              userSelect: "text",
+                              cursor: "text",
+                              wordBreak: "break-word",
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {thought.content}
+                          </div>
+                        </div>
+                        {/* Edit/Delete buttons - appear on hover */}
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditThought(thought.id);
+                            }}
+                            className="p-1 text-xs rounded-full transition"
+                            style={{
+                              backgroundColor: "rgba(134, 121, 121, 0.3)",
+                              color: "#D0CCCC",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(134, 121, 121, 0.5)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(134, 121, 121, 0.3)";
+                            }}
+                            title="Edit"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteThought(thought.id);
+                            }}
+                            className="p-1 text-xs rounded-full transition"
+                            style={{
+                              backgroundColor: "rgba(239, 68, 68, 0.2)",
+                              color: "#f87171",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(239, 68, 68, 0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(239, 68, 68, 0.2)";
+                            }}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-start gap-2">
-                      {/* Drag handle */}
-                      <div
-                        className="shrink-0 pt-1 cursor-grab"
-                        style={{ color: "#867979" }}
-                        title="Drag to reorder"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 8h16M4 16h16"
-                          />
-                        </svg>
-                      </div>
-                      {/* Thought content */}
-                      <div
-                        className="flex-1 font-mono leading-relaxed whitespace-pre-wrap select-text"
-                        style={{
-                          color: "#D0CCCC",
-                          fontSize: "18px",
-                          userSelect: "text",
-                          cursor: "text",
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere",
-                        }}
-                      >
-                        {thought.content}
-                      </div>
-                    </div>
-                    {/* Edit/Delete buttons - appear on hover */}
-                    <div 
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1"
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditThought(thought.id);
-                        }}
-                        className="p-1 text-xs rounded-full transition"
-                        style={{
-                          backgroundColor: "rgba(134, 121, 121, 0.3)",
-                          color: "#D0CCCC",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "rgba(134, 121, 121, 0.5)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "rgba(134, 121, 121, 0.3)";
-                        }}
-                        title="Edit"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteThought(thought.id);
-                        }}
-                        className="p-1 text-xs rounded-full transition"
-                        style={{
-                          backgroundColor: "rgba(239, 68, 68, 0.2)",
-                          color: "#f87171",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
-                        }}
-                        title="Delete"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
                 ))}
               </div>
             </div>
@@ -335,6 +423,7 @@ export default function LandingJournalDemo() {
             {/* Active Thought Input - Fixed at bottom */}
             <div className="relative shrink-0">
               <textarea
+                ref={textareaRef}
                 value={currentThoughtContent}
                 onChange={(e) => setCurrentThoughtContent(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -351,14 +440,15 @@ export default function LandingJournalDemo() {
         </div>
 
         {/* Bottom hint */}
-        <div 
+        <div
           className="px-8 py-4 border-t text-sm text-center"
-          style={{ 
+          style={{
             borderColor: "rgba(134, 121, 121, 0.3)",
             color: "#867979",
           }}
         >
-          Enter to wrap text · Shift+Enter to commit thought · Select text to extract
+          Enter to wrap text · Shift+Enter to commit thought · Select text to
+          extract
         </div>
 
         {/* Selection Quick Actions */}
@@ -384,10 +474,12 @@ export default function LandingJournalDemo() {
                 color: "#ffffff",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.2)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.1)";
               }}
             >
               Extract as Action
@@ -405,10 +497,12 @@ export default function LandingJournalDemo() {
                 color: "#ffffff",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.2)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.1)";
               }}
             >
               Extract as Requirement
@@ -426,10 +520,12 @@ export default function LandingJournalDemo() {
                 color: "#ffffff",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.2)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.1)";
               }}
             >
               Extract as Feature
@@ -447,10 +543,12 @@ export default function LandingJournalDemo() {
                 color: "#ffffff",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.2)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.1)";
               }}
             >
               Extract as Improvement
@@ -520,14 +618,16 @@ export default function LandingJournalDemo() {
                     backgroundColor: "rgba(134, 121, 121, 0.1)",
                   }}
                 >
-                  {extractedText || "Select a piece of your thought and then add that Extract as action item"}
+                  {extractedText ||
+                    "Select a piece of your thought and then add that Extract as action item"}
                 </p>
                 {!extractedText && (
                   <p
                     className="text-xs mt-2 italic"
                     style={{ color: "#867979" }}
                   >
-                    Select a piece of your thought and then add that Extract as action item
+                    Select a piece of your thought and then add that Extract as
+                    action item
                   </p>
                 )}
               </div>
@@ -651,7 +751,8 @@ export default function LandingJournalDemo() {
                     color: "#D0CCCC",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(134, 121, 121, 0.2)";
+                    e.currentTarget.style.backgroundColor =
+                      "rgba(134, 121, 121, 0.2)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = "transparent";
