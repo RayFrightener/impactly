@@ -126,8 +126,78 @@ When working with Prisma:
 
 Before committing:
 1. Run `npm run build` to catch all type errors
-2. Fix all TypeScript errors (don't use @ts-ignore unless absolutely necessary)
-3. Fix all ESLint warnings related to types
+2. Run `npm run lint` to catch all ESLint errors
+3. Fix all TypeScript errors (don't use @ts-ignore unless absolutely necessary)
+4. Fix all ESLint errors (warnings can be ignored, but errors must be fixed)
+5. Ensure build exits with code 0 before deploying
+
+### React Hooks Best Practices
+
+#### Avoid setState in useEffect
+```typescript
+// ❌ BAD - Calling setState synchronously in effect
+useEffect(() => {
+  if (isEditing) {
+    setEditName(feature.name); // This triggers cascading renders
+  }
+}, [isEditing, feature.name]);
+
+// ✅ GOOD - Use initialization pattern or derived state
+// Option 1: Initialize state directly
+const [editName, setEditName] = useState(feature.name);
+
+// Option 2: Use key prop to reset component
+<Component key={feature.id} feature={feature} />
+
+// Option 3: Use useMemo for derived state
+const editName = useMemo(() => feature.name, [feature.name]);
+
+// Option 4: Only setState in response to user actions or external events
+useEffect(() => {
+  const handleExternalChange = () => {
+    setEditName(externalValue); // OK - in callback
+  };
+  subscribe(handleExternalChange);
+  return () => unsubscribe(handleExternalChange);
+}, []);
+```
+
+#### Unused Variables
+- Remove unused variables or prefix with underscore if intentionally unused
+- Use ESLint disable comment only if variable is needed for type checking
+```typescript
+// ❌ BAD
+const session = await getSession(); // Never used
+
+// ✅ GOOD - Remove if not needed
+// Or prefix with underscore if needed for type
+const _session = await getSession(); // Intentionally unused
+```
+
+### Deployment Checklist
+
+**CRITICAL: Before every deployment, verify:**
+1. ✅ `npm run build` exits with code 0 (no TypeScript errors)
+2. ✅ `npm run lint` has no errors (warnings are acceptable)
+3. ✅ All React hooks follow best practices (no setState in effects)
+4. ✅ No unused variables that cause lint errors
+5. ✅ All imports are used
+6. ✅ No console.error or console.warn in production code (use proper error handling)
+
+### Common Deployment Blockers
+
+**These will prevent deployment:**
+- TypeScript compilation errors
+- ESLint errors (not warnings)
+- React hooks violations (setState in effects)
+- Unused imports/variables causing errors
+- Missing type definitions
+- Next.js build failures
+
+**These are acceptable:**
+- ESLint warnings (not errors)
+- TypeScript warnings
+- Style/linting suggestions
 
 ## Summary
 

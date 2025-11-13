@@ -281,7 +281,7 @@ function DashboardContent() {
                   </p>
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="bg-blue-300 text-white px-6 py-3 rounded-full hover:bg-blue-400 transition-all shadow-sm"
+                    className="bg-button text-button-text px-6 py-3 rounded-full hover:opacity-90 transition-all shadow-sm"
                   >
                     Create Project
                   </button>
@@ -333,20 +333,20 @@ function DashboardContent() {
                       >
                         <button
                           onClick={() => setSelectedProject(project.id)}
-                          className="w-full bg-blue-50 rounded-2xl p-6 hover:bg-blue-100 transition-all shadow-sm hover:shadow-md text-left border border-blue-200 group"
+                          className="w-full bg-surface rounded-2xl p-6 hover:bg-surface-alt transition-all shadow-sm hover:shadow-md text-left border border-border group"
                         >
                           {/* Header with Status */}
                           <div className="flex justify-between items-start mb-3">
-                            <h3 className="text-xl font-semibold text-neutral-800 group-hover:text-neutral-900 transition flex-1">
+                            <h3 className="text-xl font-semibold text-text-primary group-hover:opacity-90 transition flex-1">
                               {project.name}
                             </h3>
                             <div className="flex flex-col items-end gap-1">
-                              <span className="text-xs px-2 py-1 bg-blue-400 group-hover:bg-blue-500 text-white rounded-full capitalize transition-colors">
+                              <span className="text-xs px-2 py-1 bg-button group-hover:opacity-90 text-button-text rounded-full capitalize transition-colors">
                                 {project.status}
                               </span>
                               {stats.hasActivity &&
                                 project.status !== "ACTIVE" && (
-                                  <span className="text-xs px-2 py-0.5 bg-blue-200 group-hover:bg-blue-300 text-neutral-800 rounded-full transition-colors">
+                                  <span className="text-xs px-2 py-0.5 bg-surface-alt group-hover:opacity-80 text-text-primary rounded-full transition-colors">
                                     Recent Activity
                                   </span>
                                 )}
@@ -355,7 +355,7 @@ function DashboardContent() {
 
                           {/* Description */}
                           {project.description && (
-                            <p className="text-neutral-800/80 text-sm mb-4 line-clamp-2">
+                            <p className="text-text-secondary text-sm mb-4 line-clamp-2">
                               {project.description}
                             </p>
                           )}
@@ -364,7 +364,7 @@ function DashboardContent() {
                           <div className="mb-4 space-y-3">
                             {/* Overall Progress */}
                             <div>
-                              <div className="flex justify-between text-xs text-neutral-800 mb-1">
+                              <div className="flex justify-between text-xs text-text-primary mb-1">
                                 <span className="font-medium">
                                   Overall Progress
                                 </span>
@@ -372,9 +372,9 @@ function DashboardContent() {
                                   {progress}%
                                 </span>
                               </div>
-                              <div className="w-full bg-blue-200 group-hover:bg-blue-300 rounded-full h-2.5 transition-colors">
+                              <div className="w-full bg-surface-alt group-hover:opacity-80 rounded-full h-2.5 transition-colors">
                                 <div
-                                  className="bg-blue-400 group-hover:bg-blue-500 h-2.5 rounded-full transition-all"
+                                  className="bg-progress group-hover:opacity-90 h-2.5 rounded-full transition-all"
                                   style={{ width: `${progress}%` }}
                                 />
                               </div>
@@ -383,27 +383,27 @@ function DashboardContent() {
                             {/* Tasks Breakdown */}
                             {stats.totalTasks > 0 && (
                               <div className="grid grid-cols-3 gap-2 text-xs">
-                                <div className="bg-blue-200 group-hover:bg-blue-300 rounded-lg p-2 text-center transition-colors">
-                                  <div className="font-semibold text-neutral-800">
+                                <div className="bg-surface-alt group-hover:opacity-80 rounded-lg p-2 text-center transition-colors">
+                                  <div className="font-semibold text-text-primary">
                                     {stats.completedTasks}
                                   </div>
-                                  <div className="text-neutral-800/80">
+                                  <div className="text-text-secondary">
                                     Done
                                   </div>
                                 </div>
-                                <div className="bg-blue-200 group-hover:bg-blue-300 rounded-lg p-2 text-center transition-colors">
-                                  <div className="font-semibold text-neutral-800">
+                                <div className="bg-surface-alt group-hover:opacity-80 rounded-lg p-2 text-center transition-colors">
+                                  <div className="font-semibold text-text-primary">
                                     {stats.inProgressTasks}
                                   </div>
-                                  <div className="text-neutral-800/80">
+                                  <div className="text-text-secondary">
                                     Active
                                   </div>
                                 </div>
-                                <div className="bg-blue-200 group-hover:bg-blue-300 rounded-lg p-2 text-center transition-colors">
-                                  <div className="font-semibold text-neutral-800">
+                                <div className="bg-surface-alt group-hover:opacity-80 rounded-lg p-2 text-center transition-colors">
+                                  <div className="font-semibold text-text-primary">
                                     {stats.todoTasks}
                                   </div>
-                                  <div className="text-neutral-800/80">
+                                  <div className="text-text-secondary">
                                     Todo
                                   </div>
                                 </div>
@@ -414,16 +414,16 @@ function DashboardContent() {
                             {stats.totalFeatures > 0 && (
                               <div className="flex items-center justify-between text-xs">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-neutral-800">
+                                  <span className="text-text-primary">
                                     Features:
                                   </span>
-                                  <span className="font-semibold text-neutral-800">
+                                  <span className="font-semibold text-text-primary">
                                     {stats.completedFeatures}/
                                     {stats.totalFeatures} completed
                                   </span>
                                 </div>
                                 {stats.inProgressFeatures > 0 && (
-                                  <span className="px-2 py-1 bg-blue-200 group-hover:bg-blue-300 text-neutral-800 rounded-full transition-colors">
+                                  <span className="px-2 py-1 bg-surface-alt group-hover:opacity-80 text-text-primary rounded-full transition-colors">
                                     {stats.inProgressFeatures} in progress
                                   </span>
                                 )}
@@ -433,17 +433,17 @@ function DashboardContent() {
 
                           {/* Current Focus / Next Steps */}
                           {(stats.currentFeature || stats.nextFeature) && (
-                            <div className="mb-4 pt-4 border-t border-blue-200 group-hover:border-blue-300 transition-colors">
+                            <div className="mb-4 pt-4 border-t border-border group-hover:opacity-80 transition-colors">
                               {stats.currentFeature && (
                                 <div className="flex items-start gap-2 mb-2">
-                                  <span className="text-blue-400 text-xs mt-0.5">
+                                  <span className="text-accent text-xs mt-0.5">
                                     ⚡
                                   </span>
                                   <div className="flex-1">
-                                    <div className="text-xs text-neutral-800 font-medium mb-0.5">
+                                    <div className="text-xs text-text-primary font-medium mb-0.5">
                                       Currently Working On:
                                     </div>
-                                    <div className="text-sm text-neutral-800 font-medium">
+                                    <div className="text-sm text-text-primary font-medium">
                                       {stats.currentFeature}
                                     </div>
                                   </div>
@@ -451,14 +451,14 @@ function DashboardContent() {
                               )}
                               {stats.nextFeature && !stats.currentFeature && (
                                 <div className="flex items-start gap-2">
-                                  <span className="text-blue-400 text-xs mt-0.5">
+                                  <span className="text-accent text-xs mt-0.5">
                                     📋
                                   </span>
                                   <div className="flex-1">
-                                    <div className="text-xs text-neutral-800 font-medium mb-0.5">
+                                    <div className="text-xs text-text-primary font-medium mb-0.5">
                                       Next Up:
                                     </div>
-                                    <div className="text-sm text-neutral-800 font-medium">
+                                    <div className="text-sm text-text-primary font-medium">
                                       {stats.nextFeature}
                                     </div>
                                   </div>
@@ -468,7 +468,7 @@ function DashboardContent() {
                           )}
 
                           {/* Footer with Metadata */}
-                          <div className="flex items-center justify-between text-xs text-neutral-800 pt-3 border-t border-blue-200 group-hover:border-blue-300 transition-colors">
+                          <div className="flex items-center justify-between text-xs text-text-primary pt-3 border-t border-border group-hover:opacity-80 transition-colors">
                             <div className="flex gap-3">
                               {stats.totalTasks > 0 && (
                                 <span>{stats.totalTasks} tasks</span>
@@ -486,7 +486,7 @@ function DashboardContent() {
                                   : `Updated ${stats.daysSinceUpdate}d ago`}
                               </span>
                               {stats.daysSinceUpdate > 7 && (
-                                <span className="text-blue-400 text-[10px] mt-0.5">
+                                <span className="text-accent text-[10px] mt-0.5">
                                   Needs attention
                                 </span>
                               )}
@@ -501,9 +501,9 @@ function DashboardContent() {
 
               {showCreateModal && (
                 <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-                  <div className="bg-blue-50 rounded-3xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto border border-blue-200">
+                  <div className="bg-surface rounded-3xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto border border-border">
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-3xl font-light text-neutral-800">
+                      <h2 className="text-3xl font-light text-text-primary">
                         Create New Project
                       </h2>
                       <button
@@ -513,7 +513,7 @@ function DashboardContent() {
                           setProjectDescription("");
                           setProjectMoreInfo("");
                         }}
-                        className="text-blue-300 hover:text-blue-400 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-blue-100 transition"
+                        className="text-accent hover:opacity-80 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-alt transition"
                       >
                         ×
                       </button>
@@ -521,7 +521,7 @@ function DashboardContent() {
 
                     <div className="space-y-6">
                       <div>
-                        <label className="block text-neutral-800 font-medium mb-2">
+                        <label className="block text-text-primary font-medium mb-2">
                           Project Name *
                         </label>
                         <input
@@ -529,7 +529,7 @@ function DashboardContent() {
                           value={projectName}
                           onChange={(e) => setProjectName(e.target.value)}
                           placeholder="Enter project name..."
-                          className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:outline-none focus:border-blue-300 transition text-neutral-800 placeholder-blue-300/50 text-base"
+                          className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl focus:outline-none focus:border-accent transition text-text-primary placeholder-placeholder text-base"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -541,7 +541,7 @@ function DashboardContent() {
                       </div>
 
                       <div>
-                        <label className="block text-neutral-800 font-medium mb-2">
+                        <label className="block text-text-primary font-medium mb-2">
                           Description
                         </label>
                         <textarea
@@ -551,12 +551,12 @@ function DashboardContent() {
                           }
                           placeholder="What is this project about?"
                           rows={3}
-                          className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:outline-none focus:border-blue-300 transition text-neutral-800 placeholder-blue-300/50 resize-none text-base"
+                          className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl focus:outline-none focus:border-accent transition text-text-primary placeholder-placeholder resize-none text-base"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-neutral-800 font-medium mb-2">
+                        <label className="block text-text-primary font-medium mb-2">
                           More Info
                         </label>
                         <textarea
@@ -564,7 +564,7 @@ function DashboardContent() {
                           onChange={(e) => setProjectMoreInfo(e.target.value)}
                           placeholder="Additional details, goals, or context..."
                           rows={4}
-                          className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:outline-none focus:border-blue-300 transition text-neutral-800 placeholder-blue-300/50 resize-none text-base"
+                          className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl focus:outline-none focus:border-accent transition text-text-primary placeholder-placeholder resize-none text-base"
                         />
                       </div>
 
@@ -576,14 +576,14 @@ function DashboardContent() {
                             setProjectDescription("");
                             setProjectMoreInfo("");
                           }}
-                          className="flex-1 px-6 py-3 border-2 border-blue-200 text-neutral-800 rounded-xl hover:bg-blue-100 transition font-medium"
+                          className="flex-1 px-6 py-3 border-2 border-border text-text-primary rounded-xl hover:bg-surface-alt transition font-medium"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleCreateProject}
                           disabled={!projectName.trim()}
-                          className="flex-1 px-6 py-3 bg-blue-300 text-white rounded-xl hover:bg-blue-400 transition shadow-md hover:shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 px-6 py-3 bg-button text-button-text rounded-xl hover:opacity-90 transition shadow-md hover:shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Create Project
                         </button>

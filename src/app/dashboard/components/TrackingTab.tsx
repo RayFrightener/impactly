@@ -233,7 +233,7 @@ export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
           <button
             key={view.id}
             onClick={() => setActiveView(view.id)}
-            className={`px-8 py-4 text-lg font-medium transition ${
+            className={`px-8 py-4 text-sm font-medium transition ${
               activeView === view.id
                 ? "text-text-primary border-b-2 border-accent"
                 : "text-text-secondary hover:text-text-primary"

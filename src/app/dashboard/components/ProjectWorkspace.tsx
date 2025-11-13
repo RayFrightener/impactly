@@ -25,7 +25,7 @@ export default function ProjectWorkspace({
   const [project, setProject] = useState<ProjectWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("tracking");
+  const [activeTab, setActiveTab] = useState<TabType>("planning");
   const { isOpen, options, showConfirm, handleConfirm, handleCancel } =
     useConfirm();
 
@@ -151,8 +151,8 @@ export default function ProjectWorkspace({
       <div className="max-w-7xl mx-auto px-6 pt-6">
         <div className="flex justify-center gap-4 border-b border-border overflow-x-auto">
           {[
-            { id: "tracking" as TabType, label: "Tracking" },
             { id: "planning" as TabType, label: "Planning" },
+            { id: "tracking" as TabType, label: "Tracking" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -170,11 +170,11 @@ export default function ProjectWorkspace({
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {activeTab === "tracking" && (
-          <TrackingTab project={project} onUpdate={handleUpdate} />
-        )}
         {activeTab === "planning" && (
           <PlanningTab project={project} onUpdate={handleUpdate} />
+        )}
+        {activeTab === "tracking" && (
+          <TrackingTab project={project} onUpdate={handleUpdate} />
         )}
       </div>
 

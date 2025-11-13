@@ -107,6 +107,16 @@ export const ThemeProvider = ({
     if (!presetExists) {
       return;
     }
+    
+    // Immediately apply the new preset tokens for instant visual feedback
+    if (id !== "custom") {
+      const preset = THEME_PRESETS.find((p) => p.id === id);
+      if (preset) {
+        applyTokens(preset.tokens);
+        document.documentElement.dataset.theme = id;
+      }
+    }
+    
     setPresetId(id);
     if (id !== "custom") {
       setCustomTokens(null);
@@ -122,10 +132,14 @@ export const ThemeProvider = ({
     setPresetId("custom");
     setCustomTokens((previous) => {
       const base = previous ?? tokens;
-      return {
+      const updated = {
         ...base,
         [token]: value,
       };
+      // Immediately apply the updated token for instant visual feedback
+      applyTokens(updated);
+      document.documentElement.dataset.theme = "custom";
+      return updated;
     });
   };
 
