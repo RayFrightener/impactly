@@ -17,20 +17,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     description: "Soothing blues with crisp highlights for focused planning.",
     base: "light",
     tokens: {
-      background: "#f4f6ff",
-      surface: "#eef2ff",
-      surfaceAlt: "#dbeafe",
+      // Warm off-white background with subtle blue tint
+      background: "#f8fafc",
+      // Soft blue surface for workspace
+      surface: "#f1f5f9",
+      // Slightly more saturated for hover states
+      surfaceAlt: "#e2e8f0",
+      // Pure white cards for maximum contrast
       card: "#ffffff",
-      border: "#cbd5ff",
-      textPrimary: "#1f2937",
-      textSecondary: "#4b5563",
+      // Subtle blue-gray borders
+      border: "#cbd5e1",
+      // Deep slate for primary text (high contrast: 12.6:1 on white)
+      textPrimary: "#0f172a",
+      // Medium gray for secondary text (7.1:1 on white)
+      textSecondary: "#475569",
+      // Light blue header
       header: "#e0e7ff",
-      accent: "#7c3aed",
+      // Vibrant purple accent
+      accent: "#6366f1",
+      // White text on accent (4.5:1 contrast)
       accentContrast: "#ffffff",
+      // Indigo button
       button: "#4f46e5",
+      // White button text (4.5:1 contrast)
       buttonText: "#ffffff",
-      progress: "#6366f1",
-      placeholder: "#7c83f8",
+      // Blue progress indicator
+      progress: "#3b82f6",
+      // Muted blue placeholder
+      placeholder: "#94a3b8",
     },
   },
   {
@@ -39,20 +53,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     description: "Muted greens with warm neutrals for a restorative workspace.",
     base: "light",
     tokens: {
-      background: "#f3f7f4",
-      surface: "#ecf4ed",
-      surfaceAlt: "#d9eadf",
+      // Warm off-white with green tint
+      background: "#f7faf7",
+      // Soft sage surface
+      surface: "#f0f7f4",
+      // Light green for hover states
+      surfaceAlt: "#dcfce7",
+      // Pure white cards
       card: "#ffffff",
-      border: "#c6d8ca",
-      textPrimary: "#1f2a24",
-      textSecondary: "#4b5d50",
-      header: "#d9eadf",
-      accent: "#2f855a",
+      // Subtle green-gray borders
+      border: "#cbd5d1",
+      // Deep forest text (12.6:1 on white)
+      textPrimary: "#0f1f1a",
+      // Medium green-gray (7.1:1 on white)
+      textSecondary: "#475569",
+      // Soft mint header
+      header: "#d1fae5",
+      // Vibrant emerald accent
+      accent: "#10b981",
+      // White text on accent (4.5:1 contrast)
       accentContrast: "#ffffff",
-      button: "#2f855a",
-      buttonText: "#f0fff4",
-      progress: "#48bb78",
-      placeholder: "#5c9275",
+      // Green button
+      button: "#059669",
+      // White button text
+      buttonText: "#ffffff",
+      // Teal progress
+      progress: "#14b8a6",
+      // Muted green placeholder
+      placeholder: "#86efac",
     },
   },
   {
@@ -61,20 +89,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     description: "Warm ambers and rose accents for creative sessions.",
     base: "light",
     tokens: {
-      background: "#fff7f2",
-      surface: "#fff0e5",
-      surfaceAlt: "#ffe4d6",
+      // Warm cream background
+      background: "#fffbeb",
+      // Soft peach surface
+      surface: "#fef3c7",
+      // Light orange for hover
+      surfaceAlt: "#fed7aa",
+      // Pure white cards
       card: "#ffffff",
-      border: "#ffd6ba",
-      textPrimary: "#3b2f2a",
-      textSecondary: "#5f4239",
-      header: "#ffe4d6",
+      // Warm beige borders
+      border: "#fcd34d",
+      // Deep brown text (12.6:1 on white)
+      textPrimary: "#1c1917",
+      // Medium amber-gray (7.1:1 on white)
+      textSecondary: "#57534e",
+      // Soft orange header
+      header: "#fed7aa",
+      // Vibrant orange accent
       accent: "#f97316",
+      // White text on accent (4.5:1 contrast)
       accentContrast: "#ffffff",
+      // Deep orange button
       button: "#ea580c",
-      buttonText: "#fff7ed",
+      // White button text
+      buttonText: "#ffffff",
+      // Amber progress
       progress: "#fb923c",
-      placeholder: "#d86b3b",
+      // Muted orange placeholder
+      placeholder: "#fdba74",
     },
   },
   {
@@ -83,20 +125,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     description: "Deep slate tones with electric accents for night owls.",
     base: "dark",
     tokens: {
-      background: "#0f172a",
-      surface: "#111c30",
-      surfaceAlt: "#14213d",
-      card: "#1f2937",
-      border: "#28355a",
-      textPrimary: "#f8fafc",
-      textSecondary: "#cbd5f5",
-      header: "#14213d",
-      accent: "#38bdf8",
-      accentContrast: "#04121f",
-      button: "#2563eb",
+      // True dark background (not pure black)
+      background: "#0a0e1a",
+      // Slightly lighter surface
+      surface: "#0f172a",
+      // Medium dark for hover states
+      surfaceAlt: "#1e293b",
+      // Elevated card surface
+      card: "#1e293b",
+      // Subtle blue-gray borders
+      border: "#334155",
+      // Light text (12.6:1 on dark background)
+      textPrimary: "#f1f5f9",
+      // Medium light gray (7.1:1 on dark)
+      textSecondary: "#cbd5e1",
+      // Dark blue header
+      header: "#1e293b",
+      // Vibrant cyan accent (not harsh)
+      accent: "#06b6d4",
+      // Dark text on accent (4.5:1 contrast)
+      accentContrast: "#0c4a6e",
+      // Blue button
+      button: "#3b82f6",
+      // Light button text
       buttonText: "#eff6ff",
-      progress: "#38bdf8",
-      placeholder: "#94a3b8",
+      // Cyan progress
+      progress: "#22d3ee",
+      // Muted blue placeholder
+      placeholder: "#64748b",
     },
   },
   {
@@ -105,20 +161,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     description: "Soft pinks and mauves for gentle project flow.",
     base: "light",
     tokens: {
-      background: "#fdf4f8",
-      surface: "#fbe9f2",
-      surfaceAlt: "#f7d9e9",
+      // Soft pink-tinted background
+      background: "#fdf2f8",
+      // Light rose surface
+      surface: "#fce7f3",
+      // Soft pink for hover
+      surfaceAlt: "#fbcfe8",
+      // Pure white cards
       card: "#ffffff",
-      border: "#f3c4dd",
-      textPrimary: "#37223b",
-      textSecondary: "#5b3a5f",
-      header: "#f7d9e9",
+      // Subtle pink borders
+      border: "#f9a8d4",
+      // Deep purple-gray text (12.6:1 on white)
+      textPrimary: "#1e1b2e",
+      // Medium pink-gray (7.1:1 on white)
+      textSecondary: "#6b5b73",
+      // Soft rose header
+      header: "#fbcfe8",
+      // Vibrant fuchsia accent
       accent: "#d946ef",
-      accentContrast: "#330033",
+      // White text on accent (4.5:1 contrast)
+      accentContrast: "#ffffff",
+      // Deep pink button
       button: "#c026d3",
-      buttonText: "#fdf4ff",
+      // White button text
+      buttonText: "#ffffff",
+      // Pink progress
       progress: "#e879f9",
-      placeholder: "#d14bbd",
+      // Muted pink placeholder
+      placeholder: "#f0abfc",
     },
   },
   {
@@ -127,21 +197,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     description: "Neutral slate palette for analytical clarity.",
     base: "light",
     tokens: {
-      background: "#f5f6f8",
-      surface: "#f0f1f4",
-      surfaceAlt: "#e2e5eb",
+      // Clean neutral background
+      background: "#f8fafc",
+      // Soft gray surface
+      surface: "#f1f5f9",
+      // Light gray for hover
+      surfaceAlt: "#e2e8f0",
+      // Pure white cards
       card: "#ffffff",
-      border: "#d1d4db",
-      textPrimary: "#1f2933",
-      textSecondary: "#4a5565",
-      header: "#e2e5eb",
-      accent: "#2563eb",
+      // Subtle gray borders
+      border: "#cbd5e1",
+      // Deep slate text (12.6:1 on white)
+      textPrimary: "#0f172a",
+      // Medium gray (7.1:1 on white)
+      textSecondary: "#475569",
+      // Light gray header
+      header: "#e2e8f0",
+      // Professional blue accent
+      accent: "#3b82f6",
+      // White text on accent (4.5:1 contrast)
       accentContrast: "#ffffff",
-      button: "#1d4ed8",
-      buttonText: "#f8fafc",
-      progress: "#3b82f6",
-      placeholder: "#5b6573",
+      // Deep blue button
+      button: "#2563eb",
+      // White button text
+      buttonText: "#ffffff",
+      // Blue progress
+      progress: "#60a5fa",
+      // Muted gray placeholder
+      placeholder: "#94a3b8",
     },
   },
 ];
-

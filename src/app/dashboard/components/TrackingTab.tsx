@@ -15,6 +15,10 @@ import {
 import { useConfirm } from "@/hooks/useConfirm";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { parseFeatureActionItems } from "@/utils/featureTodos";
+import HorizontalTimeline from "@/components/HorizontalTimeline";
+import TimelineEventModal from "@/components/TimelineEventModal";
+import type { TimelineEvent as PrismaTimelineEvent } from "@/types";
+import { EVENT_TYPE_LABELS, EVENT_TYPE_DESCRIPTIONS, getEventImpactLevel, type EventType } from "@/utils/timeline";
 
 interface TrackingTabProps {
   project: ProjectWithRelations;
@@ -203,7 +207,7 @@ export default function TrackingTab({ project, onUpdate }: TrackingTabProps) {
 
   const handleAddTimelineEvent = async (
     title: string,
-    type: "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE",
+    type: "PROJECT_START" | "MVP_COMPLETE" | "BETA_LAUNCH" | "PUBLIC_RELEASE" | "MAJOR_PIVOT" | "KEY_DECISION" | "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE" | "STAKEHOLDER_REVIEW" | "INTEGRATION_COMPLETE" | "PERFORMANCE_MILESTONE",
     featureId?: string
   ) => {
     try {
@@ -634,220 +638,205 @@ function TimelineView({
   project: ProjectWithRelations;
   onAddTimelineEvent: (
     title: string,
-    type: "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE",
+    type: "PROJECT_START" | "MVP_COMPLETE" | "BETA_LAUNCH" | "PUBLIC_RELEASE" | "MAJOR_PIVOT" | "KEY_DECISION" | "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE" | "STAKEHOLDER_REVIEW" | "INTEGRATION_COMPLETE" | "PERFORMANCE_MILESTONE",
     featureId?: string
   ) => Promise<void>;
   onUpdate: () => void;
 }) {
-  const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editDate, setEditDate] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<PrismaTimelineEvent | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDescription, setNewEventDescription] = useState("");
+  const [newEventType, setNewEventType] = useState<"PROJECT_START" | "MVP_COMPLETE" | "BETA_LAUNCH" | "PUBLIC_RELEASE" | "MAJOR_PIVOT" | "KEY_DECISION" | "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE" | "STAKEHOLDER_REVIEW" | "INTEGRATION_COMPLETE" | "PERFORMANCE_MILESTONE">("MILESTONE");
+  const [newEventDate, setNewEventDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newEventFeatureId, setNewEventFeatureId] = useState<string | undefined>(undefined);
 
-  const handleStartEdit = (event: {
-    id: string;
-    title: string;
-    description: string | null;
-    date: Date;
-  }) => {
-    setEditingEventId(event.id);
-    setEditTitle(event.title);
-    setEditDescription(event.description || "");
-    setEditDate(new Date(event.date).toISOString().split("T")[0]);
+  const handleEventClick = (event: PrismaTimelineEvent) => {
+    setSelectedEvent(event);
+    setIsModalOpen(true);
   };
 
-  const handleCancelEdit = () => {
-    setEditingEventId(null);
-    setEditTitle("");
-    setEditDescription("");
-    setEditDate("");
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedEvent(null);
   };
 
-  const handleSaveEdit = async (eventId: string) => {
+  const handleAddEvent = async () => {
+    if (!newEventTitle.trim()) return;
+
     try {
-      await updateTimelineEvent(eventId, {
-        title: editTitle,
-        description: editDescription || null,
-        date: new Date(editDate),
+      await createTimelineEvent({
+        title: newEventTitle,
+        description: newEventDescription || undefined,
+        date: new Date(newEventDate),
+        type: newEventType,
+        projectId: project.id,
+        featureId: newEventFeatureId,
       });
       onUpdate();
-      handleCancelEdit();
+      setIsAddModalOpen(false);
+      setNewEventTitle("");
+      setNewEventDescription("");
+      setNewEventType("MILESTONE");
+      setNewEventDate(new Date().toISOString().split("T")[0]);
+      setNewEventFeatureId(undefined);
     } catch (err) {
-      console.error("Error updating timeline event:", err);
-      alert("Failed to update timeline event");
+      console.error("Error creating timeline event:", err);
+      alert("Failed to create timeline event");
     }
   };
 
-  const handleDelete = async (eventId: string) => {
-    if (!confirm("Are you sure you want to delete this timeline event?")) {
-      return;
-    }
-    try {
-      await deleteTimelineEvent(eventId);
-      onUpdate();
-    } catch (err) {
-      console.error("Error deleting timeline event:", err);
-      alert("Failed to delete timeline event");
-    }
-  };
+  const projectFeatures = project.features.map((f) => ({
+    id: f.id,
+    name: f.name,
+  }));
 
   return (
-    <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <h2 className="text-2xl font-light text-text-primary">Timeline</h2>
         <button
-          onClick={async () => {
-            const title = prompt("Milestone title:");
-            if (title) {
-              await onAddTimelineEvent(title, "MILESTONE");
-            }
-          }}
+          onClick={() => setIsAddModalOpen(true)}
           className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium text-sm"
         >
-          + Add Milestone
+          + Add Event
         </button>
       </div>
-      <div className="relative">
-        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-progress" />
-        <div className="space-y-6 pl-12">
-          {project.timeline.length === 0 ? (
-            <div className="text-text-primary text-center py-8">
-              No timeline events yet. Complete features or add milestones.
+      <HorizontalTimeline
+        project={project}
+        events={project.timeline}
+        onEventClick={handleEventClick}
+        projectFeatures={projectFeatures}
+      />
+      <TimelineEventModal
+        isOpen={isModalOpen}
+        event={selectedEvent}
+        onClose={handleModalClose}
+        onUpdate={onUpdate}
+        projectFeatures={projectFeatures}
+      />
+
+      {/* Add Event Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card rounded-2xl p-6 border border-border shadow-xl max-w-md w-full">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-2xl font-semibold text-text-primary">
+                Add Timeline Event
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-2xl leading-none text-text-secondary transition hover:text-text-primary"
+                aria-label="Close modal"
+              >
+                ×
+              </button>
             </div>
-          ) : (
-            [...project.timeline]
-              .sort(
-                (a, b) =>
-                  new Date(a.date).getTime() - new Date(b.date).getTime()
-              )
-              .map((event) => (
-                <div
-                  key={event.id}
-                  className="relative group"
-                  onMouseEnter={() => {}}
-                  onMouseLeave={() => {}}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent"
+                  placeholder="Event title"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newEventDescription}
+                  onChange={(e) => setNewEventDescription(e.target.value)}
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent resize-none"
+                  rows={3}
+                  placeholder="Event description (optional)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Event Type *
+                </label>
+                <select
+                  value={newEventType}
+                  onChange={(e) => setNewEventType(e.target.value as typeof newEventType)}
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent"
                 >
-                  <div className="absolute -left-16 top-2 w-3 h-3 bg-accent rounded-full border-4 border-surface" />
-                  {editingEventId === event.id ? (
-                    <div className="bg-surface-alt rounded-lg p-4 border border-border">
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs text-text-secondary mb-1">
-                            Title
-                          </label>
-                          <input
-                            type="text"
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                            autoFocus
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-text-secondary mb-1">
-                            Description
-                          </label>
-                          <textarea
-                            value={editDescription}
-                            onChange={(e) => setEditDescription(e.target.value)}
-                            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
-                            rows={3}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-text-secondary mb-1">
-                            Date
-                          </label>
-                          <input
-                            type="date"
-                            value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
-                            className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                          />
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary transition"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => handleSaveEdit(event.id)}
-                            className="px-3 py-1.5 bg-button text-button-text rounded-lg hover:opacity-90 transition text-sm font-medium"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-surface-alt rounded-lg p-4 border border-border group-hover:border-accent/50 transition-colors">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-text-primary">
-                          {event.title}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-secondary">
-                            {new Date(event.date).toLocaleDateString()}
-                          </span>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button
-                              onClick={() => handleStartEdit(event)}
-                              className="p-1.5 hover:bg-surface rounded text-text-secondary hover:text-text-primary transition"
-                              title="Edit"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(event.id)}
-                              className="p-1.5 hover:bg-surface rounded text-text-secondary hover:text-red-400 transition"
-                              title="Delete"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      {event.description && (
-                        <p className="text-text-primary text-sm">
-                          {event.description}
-                        </p>
-                      )}
-                      <span className="inline-block mt-2 px-2 py-1 bg-surface-alt text-text-primary text-xs rounded">
-                        {event.type}
-                      </span>
-                    </div>
-                  )}
+                  {Object.entries(EVENT_TYPE_LABELS).map(([type, label]) => {
+                    const impactLevel = getEventImpactLevel(type as EventType);
+                    return (
+                      <option key={type} value={type}>
+                        {label} (Impact: {impactLevel}/5)
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-xs text-text-secondary mt-1">
+                  {EVENT_TYPE_DESCRIPTIONS[newEventType]}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Date *
+                </label>
+                <input
+                  type="date"
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              {projectFeatures.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    Related Feature (optional)
+                  </label>
+                  <select
+                    value={newEventFeatureId || ""}
+                    onChange={(e) => setNewEventFeatureId(e.target.value || undefined)}
+                    className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent"
+                  >
+                    <option value="">None</option>
+                    {projectFeatures.map((feature) => (
+                      <option key={feature.id} value={feature.id}>
+                        {feature.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))
-          )}
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="flex-1 px-6 py-3 border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddEvent}
+                  disabled={!newEventTitle.trim()}
+                  className="flex-1 px-6 py-3 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Event
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

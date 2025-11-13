@@ -109,7 +109,7 @@ export interface CreateTimelineEventInput {
   title: string;
   description?: string;
   date: Date;
-  type: "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE";
+  type: "PROJECT_START" | "MVP_COMPLETE" | "BETA_LAUNCH" | "PUBLIC_RELEASE" | "MAJOR_PIVOT" | "KEY_DECISION" | "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE" | "STAKEHOLDER_REVIEW" | "INTEGRATION_COMPLETE" | "PERFORMANCE_MILESTONE";
   projectId: string;
   featureId?: string;
 }
@@ -118,7 +118,7 @@ export interface UpdateTimelineEventInput {
   title?: string;
   description?: string | null;
   date?: Date;
-  type?: "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE";
+  type?: "PROJECT_START" | "MVP_COMPLETE" | "BETA_LAUNCH" | "PUBLIC_RELEASE" | "MAJOR_PIVOT" | "KEY_DECISION" | "MILESTONE" | "FEATURE_COMPLETE" | "RELEASE" | "STAKEHOLDER_REVIEW" | "INTEGRATION_COMPLETE" | "PERFORMANCE_MILESTONE";
   featureId?: string | null;
 }
 

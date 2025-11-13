@@ -398,7 +398,7 @@ function JournalPageContent() {
 
     let contentToCommit = "";
     let shouldProcess = false;
-    let shouldCreateFile = createNewParam === "true" || fromDashboardParam === "true";
+    const shouldCreateFile = createNewParam === "true" || fromDashboardParam === "true";
     let projectIdForFile: string | undefined = undefined; // Store project ID for immediate use
 
     // Handle new fromDashboard flow (button-based)
@@ -1587,51 +1587,89 @@ function JournalPageContent() {
   };
 
   const handleExportJournal = () => {
-    const sessionData: JournalSession = {
-      id: Date.now().toString(),
-      projectId: selectedProjectId || undefined,
-      createdAt: sessionStartTime.toISOString(),
-      updatedAt: new Date().toISOString(),
-      rawThoughts: lines,
-      organizedThoughts,
-      metadata: {
-        duration: new Date().getTime() - sessionStartTime.getTime(),
-        wordCount,
-        lineCount: lines.length,
-      },
-      currentLine,
-      sessionStartTime: sessionStartTime.toISOString(),
-    };
+    try {
+      const sessionData: JournalSession = {
+        id: Date.now().toString(),
+        projectId: selectedProjectId || undefined,
+        createdAt: sessionStartTime.toISOString(),
+        updatedAt: new Date().toISOString(),
+        rawThoughts: lines,
+        organizedThoughts,
+        metadata: {
+          duration: new Date().getTime() - sessionStartTime.getTime(),
+          wordCount,
+          lineCount: lines.length,
+        },
+        currentLine,
+        sessionStartTime: sessionStartTime.toISOString(),
+      };
 
-    const json = exportJournalToJSON(sessionData);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `journal-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      const json = exportJournalToJSON(sessionData);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `journal-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to export journal";
+      alert(`Export failed: ${errorMessage}`);
+      console.error("Export error:", error);
+    }
   };
 
   const handleImportJournal = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.name.endsWith(".json")) {
+      alert("Please select a valid JSON file.");
+      event.target.value = "";
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert("File is too large. Maximum size is 10MB.");
+      event.target.value = "";
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      alert("Failed to read file. Please try again.");
+      event.target.value = "";
+    };
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const journal = importJournalFromJSON(text);
-      if (journal) {
-        setPendingImport(journal);
-        setShowImportConfirm(true);
-      } else {
-        alert("Failed to import journal. Invalid format.");
+      try {
+        const text = e.target?.result as string;
+        if (!text || !text.trim()) {
+          alert("File is empty or could not be read.");
+          event.target.value = "";
+          return;
+        }
+
+        const journal = importJournalFromJSON(text);
+        if (journal) {
+          setPendingImport(journal);
+          setShowImportConfirm(true);
+        } else {
+          alert("Failed to import journal. The file format is invalid or corrupted. Please check the console for details.");
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        alert(`Import failed: ${errorMessage}`);
+        console.error("Import error:", error);
+      } finally {
+        event.target.value = ""; // Reset input
       }
     };
     reader.readAsText(file);
-    event.target.value = ""; // Reset input
   };
 
   const confirmImport = async () => {
@@ -1906,9 +1944,9 @@ function JournalPageContent() {
   const thoughtCount = thoughts.length + (currentThoughtContent.trim() ? 1 : 0);
 
   return (
-    <div className="min-h-screen bg-[#171717] text-[#D0CCCC] flex flex-col">
+    <div className="h-screen overflow-hidden bg-[#171717] text-[#D0CCCC] flex flex-col">
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-64 max-w-sm border-r border-[#867979]/30 bg-[#151111] flex flex-col">
+        <aside className="w-64 max-w-sm border-r border-[#867979]/30 bg-[#151111] flex flex-col overflow-hidden">
           <div className="p-4 border-b border-[#867979]/30">
             <h2 className="text-sm font-semibold text-white">
               {selectedProject ? (
@@ -1931,24 +1969,6 @@ function JournalPageContent() {
             <div className="mt-4 space-y-2">
               <button
                 type="button"
-                onClick={handleCreateNewJournal}
-                className="w-full px-3 py-2 bg-[#867979] hover:bg-[#756868] text-white rounded-lg text-sm transition"
-              >
-                New Entry
-              </button>
-              <label className="block">
-                <span className="w-full inline-flex items-center justify-center px-3 py-2 border border-[#867979]/50 rounded-lg text-sm text-[#D0CCCC] hover:bg-[#867979]/10 cursor-pointer transition">
-                  Import JSON
-                </span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImportJournal}
-                  className="hidden"
-                />
-              </label>
-              <button
-                type="button"
                 onClick={handleManualSave}
                 className="w-full px-3 py-2 border border-[#867979]/50 rounded-lg text-sm text-[#D0CCCC] hover:bg-[#867979]/10 transition"
               >
@@ -1968,15 +1988,38 @@ function JournalPageContent() {
                 setCurrentFileMetadata(metadata);
               }
             }}
-            onDelete={(id, type) => {
-              if (id === currentFileId) {
-                handleCreateNewJournal();
+            onDelete={async (id, type) => {
+              try {
+                if (id === currentFileId) {
+                  handleCreateNewJournal();
+                }
+                
+                // Wrap deleteItem in Promise for async handling
+                await new Promise<void>((resolve, reject) => {
+                  try {
+                    deleteItem(id, type);
+                    resolve();
+                  } catch (error) {
+                    reject(error);
+                  }
+                });
+                
+                setSavedJournals(listSavedJournals());
+                // Update refresh trigger to ensure file explorer updates
+                setFileExplorerRefreshTrigger((prev) => prev + 1);
+              } catch (error) {
+                console.error("Delete failed:", error);
+                const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                alert(`Failed to delete ${type}: ${errorMessage}. Please try again.`);
+                // Refresh to restore state
+                setSavedJournals(listSavedJournals());
+                setFileExplorerRefreshTrigger((prev) => prev + 1);
+                throw error; // Re-throw to let optimistic UI handle it
               }
-              deleteItem(id, type);
-              setSavedJournals(listSavedJournals());
             }}
             onCreateFile={handleCreateNewJournal}
             onExportCurrent={handleExportJournal}
+            onImportCurrent={handleImportJournal}
             selectedProjectFilter={selectedProjectId}
             projects={projects}
             currentFileId={currentFileId}

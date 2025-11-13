@@ -10,6 +10,7 @@ import type { ProjectWithRelations } from "@/types";
 import ProjectWorkspace from "./components/ProjectWorkspace";
 import SettingsModal from "@/components/SettingsModal";
 import JournalShowcase from "@/components/JournalShowcase";
+import { useThemeChange } from "@/components/theme/useThemeChange";
 
 // Type aliases for backward compatibility with existing code
 type Project = ProjectWithRelations & {
@@ -33,6 +34,13 @@ function DashboardContent() {
   const firstName = session?.user?.name?.split(" ")[0] || "";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [, forceUpdate] = useState({});
+
+  // React to theme changes instantly for visual feedback
+  useThemeChange(() => {
+    // Force a re-render to ensure all components update with new theme
+    forceUpdate({});
+  });
 
   // Track session start
   useEffect(() => {

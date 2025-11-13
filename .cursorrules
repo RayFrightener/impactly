@@ -6,6 +6,15 @@
 - Always define proper interfaces or types
 - Use `unknown` if the type is truly unknown, then narrow it with type guards
 - Use generics when dealing with reusable components
+- When working with Object.entries() or similar, properly type the result:
+```typescript
+// ❌ BAD
+const impactLevel = getEventImpactLevel(type as any);
+
+// ✅ GOOD - Import and use the proper type
+import { type EventType } from "@/utils/timeline";
+const impactLevel = getEventImpactLevel(type as EventType);
+```
 
 ### Type Definitions
 - All component props must have explicit interfaces
@@ -143,8 +152,8 @@ useEffect(() => {
 }, [isEditing, feature.name]);
 
 // ✅ GOOD - Use initialization pattern or derived state
-// Option 1: Initialize state directly
-const [editName, setEditName] = useState(feature.name);
+// Option 1: Initialize state directly with function initializer
+const [editName, setEditName] = useState(() => feature.name);
 
 // Option 2: Use key prop to reset component
 <Component key={feature.id} feature={feature} />
@@ -160,7 +169,26 @@ useEffect(() => {
   subscribe(handleExternalChange);
   return () => unsubscribe(handleExternalChange);
 }, []);
+
+// Option 5: When setState in effect is necessary (e.g., syncing with props on mode change)
+// Use eslint-disable with explanation comment
+useEffect(() => {
+  if (isEditing && !prevIsEditingRef.current) {
+    // This is necessary to sync edit state with feature props when user starts editing
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditName(feature.name);
+  }
+  prevIsEditingRef.current = isEditing;
+}, [isEditing, feature.name]);
 ```
+
+**CRITICAL:** The React hooks linter will error on setState in effects. Only use eslint-disable when:
+1. Syncing local edit state with props when entering/exiting edit mode
+2. Loading from localStorage/external storage
+3. Optimistic UI updates for drag-and-drop operations
+4. Other legitimate cases where state must sync with external systems
+
+Always add a comment explaining WHY the eslint-disable is necessary.
 
 #### Unused Variables
 - Remove unused variables or prefix with underscore if intentionally unused
@@ -172,6 +200,17 @@ const session = await getSession(); // Never used
 // ✅ GOOD - Remove if not needed
 // Or prefix with underscore if needed for type
 const _session = await getSession(); // Intentionally unused
+```
+
+#### Variable Declaration (prefer-const)
+- Always use `const` for variables that are never reassigned
+- Use `let` only when the variable will be reassigned
+```typescript
+// ❌ BAD
+let shouldCreateFile = createNewParam === "true";
+
+// ✅ GOOD
+const shouldCreateFile = createNewParam === "true";
 ```
 
 ### Deployment Checklist

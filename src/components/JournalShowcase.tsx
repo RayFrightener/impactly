@@ -70,17 +70,17 @@ export default function JournalShowcase() {
       : "";
 
   return (
-    <div className="bg-[#171717] rounded-2xl border border-[#867979]/30 shadow-sm overflow-hidden">
+    <div className="journal-showcase bg-[#171717] rounded-2xl border border-[#D0CCCC]/30 shadow-sm overflow-hidden">
       {/* Project Selector */}
       {projects.length > 0 && (
-        <div className="px-8 pt-6 pb-4 border-b border-[#867979]/30">
-          <label className="block text-sm text-[#867979] mb-2">
+        <div className="px-8 pt-6 pb-4 border-b border-[#D0CCCC]/30">
+          <label className="block text-sm text-[#D0CCCC] mb-2">
             Select Project (optional)
           </label>
           <select
             value={selectedProjectId || ""}
             onChange={(e) => setSelectedProjectId(e.target.value || null)}
-            className="bg-[#171717] border border-[#867979]/30 rounded-lg px-4 py-2 text-[#D0CCCC] focus:outline-none focus:border-[#867979] text-sm"
+            className="bg-[#171717] border border-[#D0CCCC]/30 rounded-lg px-4 py-2 text-[#D0CCCC] focus:outline-none focus:border-[#D0CCCC] text-sm"
           >
             <option value="">Home</option>
             {projects.map((project) => (
@@ -110,13 +110,13 @@ export default function JournalShowcase() {
       </div>
 
       {/* Hint Text and Continue Button */}
-      <div className="px-8 py-4 border-t border-[#867979]/30">
+      <div className="px-8 py-4 border-t border-[#D0CCCC]/30">
         {showContinueButton ? (
           <div className="flex flex-col items-center gap-3">
             <button
               onClick={handleContinueToJournal}
               disabled={isNavigating}
-              className="px-8 py-3 bg-[#867979] hover:bg-[#756868] text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-in fade-in duration-300"
+              className="px-8 py-3 bg-[#D0CCCC] hover:bg-white text-[#171717] rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-in fade-in duration-300"
             >
               {isNavigating ? (
                 <>
@@ -161,12 +161,12 @@ export default function JournalShowcase() {
                 </>
               )}
             </button>
-            <p className="text-xs text-[#867979]">
+            <p className="text-xs text-[#D0CCCC]">
               Enter to wrap text · Shift+Enter to continue · Your thought will be saved as a new journal entry
             </p>
           </div>
         ) : (
-          <p className="text-sm text-[#867979] text-center">
+          <p className="text-sm text-[#D0CCCC] text-center">
             Enter to wrap text · Type your thoughts, then press Shift+Enter to continue to Journal
           </p>
         )}

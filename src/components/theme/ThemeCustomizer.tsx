@@ -56,6 +56,7 @@ export const ThemeCustomizer = () => {
     updateCustomToken,
     setPreset,
     resetTheme,
+    previewPreset,
   } = useTheme();
 
   const selectedPreset = useMemo(
@@ -82,13 +83,17 @@ export const ThemeCustomizer = () => {
           Choose a curated palette as a starting point or craft your own.
         </p>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div
+          className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3"
+          onMouseLeave={() => previewPreset(null)}
+        >
           {presets.map((preset) => {
             const isActive = preset.id === presetId;
             return (
               <button
                 key={preset.id}
                 type="button"
+                onMouseEnter={() => previewPreset(preset.id)}
                 onClick={() => setPreset(preset.id)}
                 className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                   isActive
@@ -154,9 +159,15 @@ export const ThemeCustomizer = () => {
               <input
                 type="color"
                 value={toColorInputValue(tokens[token])}
-                onChange={(event) =>
-                  updateCustomToken(token, event.target.value)
-                }
+                onInput={(event) => {
+                  // onInput fires immediately as user drags, for instant feedback
+                  const target = event.target as HTMLInputElement;
+                  updateCustomToken(token, target.value);
+                }}
+                onChange={(event) => {
+                  // onChange as fallback for browsers that don't support onInput on color inputs
+                  updateCustomToken(token, event.target.value);
+                }}
                 className="h-10 w-10 cursor-pointer rounded-md border border-border bg-surface"
                 aria-label={label}
               />

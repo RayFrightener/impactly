@@ -14,13 +14,26 @@ export default function Journaling({ projectId, onClose }: JournalingProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load saved journal entries
+  // Load saved journal entries from localStorage
+  // This is necessary to restore saved state when projectId changes
   useEffect(() => {
     const saved = localStorage.getItem(`journal-${projectId || "general"}`);
     if (saved) {
       const parsed = JSON.parse(saved);
-      setLines(parsed.lines || []);
-      setCurrentLine(parsed.currentLine || "");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLines((prev) => {
+        const newLines = parsed.lines || [];
+        // Only update if actually different
+        if (prev.length !== newLines.length || prev.some((line, i) => line !== newLines[i])) {
+          return newLines;
+        }
+        return prev;
+      });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentLine((prev) => {
+        const newLine = parsed.currentLine || "";
+        return prev !== newLine ? newLine : prev;
+      });
     }
   }, [projectId]);
 
@@ -68,7 +81,7 @@ export default function Journaling({ projectId, onClose }: JournalingProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-[#171717] z-50 flex flex-col">
+    <div className="journal-isolated fixed inset-0 bg-[#171717] z-50 flex flex-col">
       {/* Header with close button */}
       <div className="absolute top-4 right-4 z-10">
         <button

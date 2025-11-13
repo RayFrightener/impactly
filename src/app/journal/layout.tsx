@@ -13,6 +13,10 @@ export default async function JournalLayout({
     redirect("/");
   }
 
-  return <SessionProvider>{children}</SessionProvider>;
+  return (
+    <div className="journal-isolated min-h-screen">
+      <SessionProvider>{children}</SessionProvider>
+    </div>
+  );
 }
 

@@ -1,20 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --theme-background: #f4f6ff;
-  --theme-surface: #eef2ff;
-  --theme-surface-alt: #dbeafe;
+  /* Default theme: Serene Blue - Updated to match redesigned preset */
+  --theme-background: #f8fafc;
+  --theme-surface: #f1f5f9;
+  --theme-surface-alt: #e2e8f0;
   --theme-card: #ffffff;
-  --theme-border: #cbd5ff;
-  --theme-text-primary: #1f2937;
-  --theme-text-secondary: #4b5563;
+  --theme-border: #cbd5e1;
+  --theme-text-primary: #0f172a;
+  --theme-text-secondary: #475569;
   --theme-header: #e0e7ff;
-  --theme-accent: #7c3aed;
+  --theme-accent: #6366f1;
   --theme-accent-contrast: #ffffff;
   --theme-button: #4f46e5;
   --theme-button-text: #ffffff;
-  --theme-progress: #6366f1;
-  --theme-placeholder: #7c83f8;
+  --theme-progress: #3b82f6;
+  --theme-placeholder: #94a3b8;
 }
 
 @theme inline {
@@ -36,23 +37,61 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Override browser color preferences and ensure theme colors are always applied */
+/* color-scheme will be dynamically set by ThemeProvider based on theme base */
 html {
-  background-color: var(--theme-background);
+  background-color: var(--theme-background) !important;
+  color: var(--theme-text-primary) !important;
 }
 
+/* Force all elements to inherit theme colors, preventing browser overrides */
+* {
+  color: inherit;
+}
+
+/* Explicit color declarations for all text elements to override browser defaults */
 body {
-  background-color: var(--theme-background);
-  color: var(--theme-text-primary);
+  background-color: var(--theme-background) !important;
+  color: var(--theme-text-primary) !important;
   font-family: Arial, Helvetica, sans-serif;
-  transition:
-    background-color 200ms ease,
-    color 200ms ease;
+  /* Removed transitions for instant theme switching */
+}
+
+/* Ensure all text elements use theme colors */
+p, h1, h2, h3, h4, h5, h6, span, div, a, label, button, input, textarea, select {
+  color: inherit;
+}
+
+/* Links should use accent color but inherit from theme */
+a {
+  color: var(--theme-accent);
+}
+
+a:hover {
+  opacity: 0.8;
+}
+
+/* Form elements should respect theme */
+input, textarea, select {
+  background-color: var(--theme-surface);
+  color: var(--theme-text-primary);
+  border-color: var(--theme-border);
+}
+
+/* Override browser autofill styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--theme-text-primary) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--theme-surface) inset !important;
+  box-shadow: 0 0 0px 1000px var(--theme-surface) inset !important;
 }
 
 ::placeholder {
   color: var(--theme-placeholder);
   opacity: 0.72;
-  transition: color 200ms ease;
+  /* Removed transition for instant theme switching */
 }
 
 @keyframes slideUpFadeIn {
@@ -68,4 +107,160 @@ body {
 
 .thought-enter-animation {
   animation: slideUpFadeIn 0.4s ease-out forwards;
+}
+
+/* Journal Isolation - Completely isolate journal from theme tokens */
+.journal-isolated {
+  /* Override all theme color inheritance */
+  color: #D0CCCC !important;
+  background-color: #171717 !important;
+}
+
+.journal-isolated * {
+  /* Prevent theme color inheritance for all child elements */
+  color: inherit !important;
+}
+
+/* Journal text elements - explicit readable colors */
+.journal-isolated p,
+.journal-isolated span,
+.journal-isolated div,
+.journal-isolated h1,
+.journal-isolated h2,
+.journal-isolated h3,
+.journal-isolated h4,
+.journal-isolated h5,
+.journal-isolated h6,
+.journal-isolated label {
+  color: #D0CCCC !important;
+}
+
+.journal-isolated a {
+  color: #D0CCCC !important;
+}
+
+.journal-isolated a:hover {
+  color: #ffffff !important;
+}
+
+/* Journal form elements */
+.journal-isolated input,
+.journal-isolated textarea,
+.journal-isolated select {
+  background-color: transparent !important;
+  color: #D0CCCC !important;
+  border-color: rgba(208, 204, 204, 0.3) !important;
+}
+
+.journal-isolated input:focus,
+.journal-isolated textarea:focus,
+.journal-isolated select:focus {
+  background-color: transparent !important;
+  color: #D0CCCC !important;
+  border-color: #D0CCCC !important;
+  outline: none !important;
+}
+
+.journal-isolated input[type="text"],
+.journal-isolated input[type="checkbox"],
+.journal-isolated textarea {
+  background-color: transparent !important;
+  color: #D0CCCC !important;
+}
+
+.journal-isolated input[type="checkbox"] {
+  background-color: #171717 !important;
+  border-color: #867979 !important;
+}
+
+.journal-isolated select option {
+  background-color: #171717 !important;
+  color: #D0CCCC !important;
+}
+
+/* Journal buttons */
+.journal-isolated button {
+  color: #D0CCCC !important;
+}
+
+.journal-isolated button:hover:not(:disabled) {
+  color: #ffffff !important;
+}
+
+.journal-isolated button:disabled {
+  opacity: 0.5 !important;
+}
+
+/* Journal placeholders */
+.journal-isolated ::placeholder {
+  color: #D0CCCC !important;
+  opacity: 0.5 !important;
+}
+
+/* Journal autofill override */
+.journal-isolated input:-webkit-autofill,
+.journal-isolated input:-webkit-autofill:hover,
+.journal-isolated input:-webkit-autofill:focus,
+.journal-isolated input:-webkit-autofill:active {
+  -webkit-text-fill-color: #D0CCCC !important;
+  -webkit-box-shadow: 0 0 0px 1000px #171717 inset !important;
+  box-shadow: 0 0 0px 1000px #171717 inset !important;
+}
+
+/* Legacy journal-showcase class for backward compatibility */
+.journal-showcase {
+  color: #D0CCCC !important;
+}
+
+.journal-showcase * {
+  color: #D0CCCC !important;
+}
+
+.journal-showcase input,
+.journal-showcase textarea,
+.journal-showcase select {
+  background-color: transparent !important;
+  color: #D0CCCC !important;
+  border-color: rgba(208, 204, 204, 0.3) !important;
+}
+
+.journal-showcase input:focus,
+.journal-showcase textarea:focus,
+.journal-showcase select:focus {
+  background-color: transparent !important;
+  color: #D0CCCC !important;
+  border-color: #D0CCCC !important;
+  outline: none !important;
+}
+
+.journal-showcase select option {
+  background-color: #171717 !important;
+  color: #D0CCCC !important;
+}
+
+.journal-showcase label {
+  color: #D0CCCC !important;
+}
+
+.journal-showcase p {
+  color: #D0CCCC !important;
+}
+
+.journal-showcase button {
+  background-color: #D0CCCC !important;
+  color: #171717 !important;
+}
+
+.journal-showcase button:hover:not(:disabled) {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+}
+
+.journal-showcase button:disabled {
+  opacity: 0.5 !important;
+}
+
+.journal-showcase ::placeholder {
+  color: #D0CCCC !important;
+  opacity: 0.5 !important;
 }

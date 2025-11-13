@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { FeatureWithTasks } from "@/types";
 
 interface FeatureCardProps {
@@ -26,19 +26,29 @@ export default function FeatureCard({
   onDelete,
   onStatusChange,
 }: FeatureCardProps) {
-  const [editName, setEditName] = useState(feature.name);
-  const [editDescription, setEditDescription] = useState(feature.description);
-  const [editImpact, setEditImpact] = useState(feature.impact);
-  const [editExpanded, setEditExpanded] = useState(feature.expanded || "");
+  // Initialize edit state from feature props
+  const [editName, setEditName] = useState(() => feature.name);
+  const [editDescription, setEditDescription] = useState(() => feature.description);
+  const [editImpact, setEditImpact] = useState(() => feature.impact);
+  const [editExpanded, setEditExpanded] = useState(() => feature.expanded || "");
 
+  // Reset edit state when entering edit mode
+  // This is necessary to sync edit state with feature props when user starts editing
+  const prevIsEditingRef = useRef(isEditing);
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing && !prevIsEditingRef.current) {
+      // Just entered edit mode - reset to current feature values
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditName(feature.name);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditDescription(feature.description);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditImpact(feature.impact);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditExpanded(feature.expanded || "");
     }
-  }, [isEditing, feature]);
+    prevIsEditingRef.current = isEditing;
+  }, [isEditing, feature.name, feature.description, feature.impact, feature.expanded]);
 
   const handleSave = () => {
     onUpdate({

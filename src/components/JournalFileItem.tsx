@@ -5,6 +5,7 @@ import {
   type JournalFileSystemItem,
   type JournalFile,
   type JournalFolder,
+  countFolderChildren,
 } from "@/lib/journalStorage";
 import { useConfirm } from "@/hooks/useConfirm";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -16,7 +17,7 @@ interface JournalFileItemProps {
   onOpen: (item: JournalFileSystemItem) => void;
   onSelect?: (e: React.MouseEvent) => void;
   onRename: (id: string, newName: string, type: "file" | "folder") => void;
-  onDelete: (id: string, type: "file" | "folder") => void;
+  onDelete: (id: string, type: "file" | "folder") => Promise<void>;
   onDragStart: (e: React.DragEvent, item: JournalFileSystemItem) => void;
   onDragEnd: () => void;
   projectName?: string;
@@ -39,19 +40,75 @@ export default function JournalFileItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(item.name);
   const [showActions, setShowActions] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { isOpen, options, showConfirm, handleConfirm, handleCancel } =
     useConfirm();
   const clickTimeoutRef = useRef<number | null>(null);
 
+  // Update editName when item.name changes (but not when editing)
+  // This is necessary to sync edit state with item props when not editing
+  useEffect(() => {
+    if (!isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEditName((prev) => (prev !== item.name ? item.name : prev));
+    }
+  }, [item.name, isEditing]);
+
   const isFolder = item.type === "folder";
   const file = !isFolder ? (item as JournalFile) : null;
   const isCompact = density === "compact";
-  const basePadding = isCompact ? "py-1.5 px-2.5" : "py-2 px-3";
+  const basePadding = isCompact ? "py-2.5 px-3" : "py-3 px-4";
+
+  // Extract folder name from path
+  const getFolderName = (): string | null => {
+    if (file && file.path && file.parentId) {
+      // Extract folder name from parentId (e.g., "/folder1" -> "folder1")
+      const parts = file.parentId.split("/").filter(Boolean);
+      if (parts.length > 0) {
+        // If it's a project folder, don't show it
+        if (parts[0].startsWith("project-")) {
+          return null;
+        }
+        return parts[parts.length - 1];
+      }
+    }
+    return null;
+  };
+
+  const folderName = getFolderName();
+
+  // Format date/time nicely
+  const formatDateTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } else if (diffDays === 1) {
+      return "Yesterday";
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: "short" });
+    } else if (diffDays < 365) {
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    } else {
+      return date.toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  };
+
   const rowStateClasses = isCurrentFile
-    ? "bg-[#2a2323] border-l-2 border-[#9f8f8f]"
+    ? "bg-[#2a2323]/50 border-l-2 border-[#9f8f8f]"
     : isSelected
-    ? "bg-[#241c1c] border-l-2 border-[#867979]"
-    : "border-l-2 border-transparent hover:bg-[#1f1818]";
+    ? "bg-[#241c1c]/50 border-l-2 border-[#867979]"
+    : "border-l-2 border-transparent hover:bg-[#1f1818]/30";
 
   const handleRename = () => {
     if (editName && editName.trim() && editName !== item.name) {
@@ -118,10 +175,14 @@ export default function JournalFileItem({
       }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
-      className={`group relative flex items-center gap-2 rounded-md ${basePadding} transition-colors cursor-pointer ${rowStateClasses}`}
+      className={`group relative flex items-center gap-3 rounded-lg ${basePadding} transition-all cursor-pointer ${rowStateClasses}`}
     >
-      <div className={`flex items-center ${isCompact ? "gap-2" : "gap-3"} flex-1 min-w-0`}>
-        {/* Checkbox for selection */}
+      <div
+        className={`flex items-center ${
+          isCompact ? "gap-2.5" : "gap-3"
+        } flex-1 min-w-0`}
+      >
+        {/* Subtle checkbox - only visible on hover or when selected */}
         {onSelect && (
           <input
             type="checkbox"
@@ -135,14 +196,19 @@ export default function JournalFileItem({
                 onSelect(e);
               }
             }}
-            className="w-4 h-4 text-[#867979] bg-[#171717] border-[#867979] rounded focus:ring-[#867979]"
+            className={`w-3.5 h-3.5 text-[#867979] bg-[#171717] border-[#867979]/30 rounded focus:ring-[#867979] transition-opacity ${
+              isSelected || showActions
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100"
+            }`}
           />
         )}
-        {/* Icon */}
-        <div className="flex-shrink-0 text-[#867979]">
+
+        {/* Icon - more subtle */}
+        <div className="flex-shrink-0 text-[#867979]/60">
           {isFolder ? (
             <svg
-              className={`${isCompact ? "w-4 h-4" : "w-5 h-5"}`}
+              className={`${isCompact ? "w-4 h-4" : "w-4 h-4"}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -156,7 +222,7 @@ export default function JournalFileItem({
             </svg>
           ) : (
             <svg
-              className={`${isCompact ? "w-4 h-4" : "w-5 h-5"}`}
+              className={`${isCompact ? "w-4 h-4" : "w-4 h-4"}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -171,7 +237,7 @@ export default function JournalFileItem({
           )}
         </div>
 
-        {/* Name */}
+        {/* Content */}
         <div className="flex-1 min-w-0">
           {isEditing ? (
             <input
@@ -185,77 +251,103 @@ export default function JournalFileItem({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
+              {/* File name - prominent */}
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className={`truncate ${
-                    isCompact ? "text-sm" : "text-[15px]"
-                  } font-medium text-white ${
-                    isCurrentFile ? "text-[#d8cfcf]" : ""
+                    isCompact ? "text-sm" : "text-base"
+                  } font-medium ${
+                    isCurrentFile ? "text-[#D0CCCC]" : "text-[#D0CCCC]"
                   }`}
                 >
                   {item.name}
                 </span>
                 {isCurrentFile && (
-                  <span className="text-[10px] uppercase tracking-wide text-[#867979]">
+                  <span className="text-[10px] px-1.5 py-0.5 bg-[#867979]/20 text-[#867979] rounded uppercase tracking-wide">
                     Active
                   </span>
                 )}
               </div>
-              {file && (
-                <div
-                  className={`flex flex-wrap items-center gap-2 text-[#867979] ${
-                    isCompact ? "text-[10px]" : "text-xs"
-                  }`}
-                >
-                  <span>{file.metadata?.wordCount || 0} words</span>
-                  <span>•</span>
-                  <span
-                    title={`Last updated: ${new Date(
-                      file.updatedAt
-                    ).toLocaleString()}`}
-                  >
-                    {new Date(file.updatedAt).toLocaleDateString()}
-                  </span>
-                  {file.createdAt && file.createdAt !== file.updatedAt && (
-                    <>
-                      <span>•</span>
-                      <span
-                        title={`Created: ${new Date(
-                          file.createdAt
-                        ).toLocaleString()}`}
+
+              {/* Metadata row */}
+              <div className="flex items-center gap-2 text-[#867979] text-xs">
+                {file && (
+                  <>
+                    <span className="flex items-center gap-1.5">
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        Created {new Date(file.createdAt).toLocaleDateString()}
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <span title={new Date(file.updatedAt).toLocaleString()}>
+                        {formatDateTime(file.updatedAt)}
                       </span>
-                    </>
-                  )}
-                  {projectName && (
-                    <>
-                      <span>•</span>
-                      <span>{projectName}</span>
-                    </>
-                  )}
-                </div>
-              )}
-              {isFolder && (
-                <div
-                  className={`${
-                    isCompact ? "text-[10px]" : "text-xs"
-                  } text-[#867979]`}
-                >
-                  {new Date((item as JournalFolder).updatedAt).toLocaleDateString()}
-                </div>
-              )}
+                    </span>
+                    {folderName && (
+                      <>
+                        <span className="text-[#867979]/40">•</span>
+                        <span className="flex items-center gap-1">
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                            />
+                          </svg>
+                          <span>{folderName}</span>
+                        </span>
+                      </>
+                    )}
+                  </>
+                )}
+                {isFolder && (
+                  <span className="flex items-center gap-1.5">
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span
+                      title={new Date(
+                        (item as JournalFolder).updatedAt
+                      ).toLocaleString()}
+                    >
+                      {formatDateTime((item as JournalFolder).updatedAt)}
+                    </span>
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Actions */}
+        {/* Actions - subtle, appear on hover */}
         {!isEditing && (
           <div
-            className={`flex items-center ${
-              isCompact ? "gap-1.5" : "gap-2"
-            } ${
+            className={`flex items-center gap-1.5 ${
               showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             } transition-opacity`}
           >
@@ -265,32 +357,120 @@ export default function JournalFileItem({
                 setIsEditing(true);
                 setEditName(item.name);
               }}
-              className={`${
-                isCompact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs"
-              } rounded text-[#D0CCCC] hover:text-white transition`}
+              className="p-1.5 rounded text-[#867979] hover:text-[#D0CCCC] hover:bg-[#867979]/10 transition"
               title="Rename"
             >
-              ✎
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
             </button>
             <button
               onClick={async (e) => {
                 e.stopPropagation();
+
+                if (isDeleting) return; // Prevent double-clicks
+
+                let message = `Are you sure you want to delete ${
+                  isFolder ? "folder" : "file"
+                } "${item.name}"?`;
+
+                // For folders, show child count warning
+                if (isFolder) {
+                  const folder = item as JournalFolder;
+                  const { fileCount, folderCount } = countFolderChildren(
+                    folder.path
+                  );
+                  const totalChildren = fileCount + folderCount;
+
+                  if (totalChildren > 0) {
+                    const childDetails: string[] = [];
+                    if (folderCount > 0) {
+                      childDetails.push(
+                        `${folderCount} folder${folderCount !== 1 ? "s" : ""}`
+                      );
+                    }
+                    if (fileCount > 0) {
+                      childDetails.push(
+                        `${fileCount} file${fileCount !== 1 ? "s" : ""}`
+                      );
+                    }
+                    message += `\n\nThis folder contains ${childDetails.join(
+                      " and "
+                    )}. All contents will be permanently deleted.`;
+                  }
+                }
+
+                message += "\n\nThis action cannot be undone.";
+
                 const confirmed = await showConfirm({
                   title: `Delete ${isFolder ? "Folder" : "File"}`,
-                  message: `Are you sure you want to delete ${isFolder ? "folder" : "file"} "${item.name}"? This action cannot be undone.`,
+                  message,
                   confirmText: "Delete",
                   cancelText: "Cancel",
                 });
                 if (confirmed) {
-                  onDelete(item.id, isFolder ? "folder" : "file");
+                  setIsDeleting(true);
+                  try {
+                    await onDelete(item.id, isFolder ? "folder" : "file");
+                  } catch (error) {
+                    setIsDeleting(false);
+                    console.error("Delete failed:", error);
+                  }
                 }
               }}
-              className={`${
-                isCompact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs"
-              } rounded text-red-400 hover:text-red-300 transition`}
-              title="Delete"
+              disabled={isDeleting}
+              className={`p-1.5 rounded transition ${
+                isDeleting
+                  ? "text-[#867979]/50 cursor-not-allowed"
+                  : "text-[#867979] hover:text-red-400 hover:bg-red-500/10"
+              }`}
+              title={isDeleting ? "Deleting..." : "Delete"}
             >
-              ×
+              {isDeleting ? (
+                <svg
+                  className="w-3.5 h-3.5 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              )}
             </button>
           </div>
         )}
@@ -308,5 +488,3 @@ export default function JournalFileItem({
     </div>
   );
 }
-
-

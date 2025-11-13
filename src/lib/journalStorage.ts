@@ -166,13 +166,35 @@ export function listSavedJournals(): SavedJournalMetadata[] {
   if (!saved) return [];
 
   try {
-    const list = JSON.parse(saved);
-    // Filter out any journals that no longer exist
-    return list.filter((j: SavedJournalMetadata) => {
+    const list: SavedJournalMetadata[] = JSON.parse(saved);
+    
+    // Validate it's an array
+    if (!Array.isArray(list)) {
+      console.error("journal-saved-list is not an array, resetting");
+      localStorage.setItem("journal-saved-list", JSON.stringify([]));
+      return [];
+    }
+    
+    // Filter out any journals that no longer exist and validate structure
+    const validList = list.filter((j: SavedJournalMetadata) => {
+      // Must have required fields
+      if (!j || typeof j.id !== "string" || !j.id.trim()) {
+        return false;
+      }
+      // Must exist in localStorage
       return localStorage.getItem(`journal-saved-${j.id}`) !== null;
     });
+    
+    // If we filtered out items, update the list to keep it in sync
+    if (validList.length !== list.length) {
+      localStorage.setItem("journal-saved-list", JSON.stringify(validList));
+    }
+    
+    return validList;
   } catch (e) {
     console.error("Error listing journals:", e);
+    // Reset corrupted list
+    localStorage.setItem("journal-saved-list", JSON.stringify([]));
     return [];
   }
 }
@@ -180,32 +202,170 @@ export function listSavedJournals(): SavedJournalMetadata[] {
 export function deleteJournal(id: string): void {
   if (typeof window === "undefined") return;
 
+  // First, remove the item from localStorage
   localStorage.removeItem(`journal-saved-${id}`);
 
-  const savedList = listSavedJournals();
-  const filtered = savedList.filter((j) => j.id !== id);
-  localStorage.setItem("journal-saved-list", JSON.stringify(filtered));
+  // Then, directly read and update the journal-saved-list
+  // This ensures we're working with the actual list, not a filtered version
+  const savedListStr = localStorage.getItem("journal-saved-list");
+  if (!savedListStr) {
+    // No list exists, nothing to update
+    return;
+  }
+
+  try {
+    const savedList: SavedJournalMetadata[] = JSON.parse(savedListStr);
+    
+    // Filter out the deleted item and any stale entries (items that no longer exist)
+    const filtered = savedList.filter((j) => {
+      // Remove the deleted item
+      if (j.id === id) return false;
+      // Also remove any stale entries (items that don't exist in localStorage)
+      return localStorage.getItem(`journal-saved-${j.id}`) !== null;
+    });
+    
+    // Save the updated list
+    localStorage.setItem("journal-saved-list", JSON.stringify(filtered));
+  } catch (e) {
+    console.error("Error updating journal list during delete:", e);
+    // If parsing fails, try to rebuild the list from actual files
+    const actualList = listSavedJournals();
+    localStorage.setItem("journal-saved-list", JSON.stringify(actualList));
+  }
 }
 
+/**
+ * Exports a journal session to JSON string with error handling
+ * @param data - The journal session to export
+ * @returns JSON string representation of the journal
+ * @throws Error if data is invalid or serialization fails
+ */
 export function exportJournalToJSON(data: JournalSession): string {
-  return JSON.stringify(data, null, 2);
+  if (!data) {
+    throw new Error("Cannot export: journal data is required");
+  }
+
+  try {
+    // Validate essential fields
+    if (typeof data.id !== "string" || !data.id.trim()) {
+      throw new Error("Invalid journal: missing or invalid id");
+    }
+
+    if (!data.rawThoughts || !Array.isArray(data.rawThoughts)) {
+      throw new Error("Invalid journal: rawThoughts must be an array");
+    }
+
+    if (!data.organizedThoughts || !Array.isArray(data.organizedThoughts)) {
+      throw new Error("Invalid journal: organizedThoughts must be an array");
+    }
+
+    if (!data.metadata || typeof data.metadata !== "object") {
+      throw new Error("Invalid journal: metadata is required");
+    }
+
+    // Serialize with proper formatting
+    const jsonString = JSON.stringify(data, null, 2);
+    
+    if (!jsonString || jsonString === "null") {
+      throw new Error("Failed to serialize journal data");
+    }
+
+    return jsonString;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Export failed: ${error.message}`);
+    }
+    throw new Error("Export failed: Unknown error occurred");
+  }
 }
 
+/**
+ * Imports a journal session from JSON string with comprehensive validation
+ * @param json - JSON string to import
+ * @returns Parsed JournalSession or null if invalid
+ */
 export function importJournalFromJSON(json: string): JournalSession | null {
+  if (!json || typeof json !== "string" || !json.trim()) {
+    console.error("Import failed: Invalid JSON string provided");
+    return null;
+  }
+
   try {
     const parsed = JSON.parse(json);
-    // Validate structure
-    if (
-      !parsed.rawThoughts ||
-      !Array.isArray(parsed.rawThoughts) ||
-      !parsed.organizedThoughts ||
-      !Array.isArray(parsed.organizedThoughts)
-    ) {
-      throw new Error("Invalid journal format");
+
+    // Validate it's an object
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Invalid format: expected an object");
     }
+
+    // Validate essential fields
+    if (typeof parsed.id !== "string" || !parsed.id.trim()) {
+      throw new Error("Missing or invalid id field");
+    }
+
+    if (!parsed.rawThoughts) {
+      throw new Error("Missing rawThoughts field");
+    }
+    if (!Array.isArray(parsed.rawThoughts)) {
+      throw new Error("rawThoughts must be an array");
+    }
+
+    if (!parsed.organizedThoughts) {
+      throw new Error("Missing organizedThoughts field");
+    }
+    if (!Array.isArray(parsed.organizedThoughts)) {
+      throw new Error("organizedThoughts must be an array");
+    }
+
+    // Validate metadata
+    if (!parsed.metadata || typeof parsed.metadata !== "object") {
+      throw new Error("Missing or invalid metadata field");
+    }
+
+    // Validate metadata properties
+    if (typeof parsed.metadata.wordCount !== "number" || parsed.metadata.wordCount < 0) {
+      throw new Error("Invalid metadata: wordCount must be a non-negative number");
+    }
+
+    if (typeof parsed.metadata.lineCount !== "number" || parsed.metadata.lineCount < 0) {
+      throw new Error("Invalid metadata: lineCount must be a non-negative number");
+    }
+
+    if (typeof parsed.metadata.duration !== "number" || parsed.metadata.duration < 0) {
+      throw new Error("Invalid metadata: duration must be a non-negative number");
+    }
+
+    // Validate dates if present
+    if (parsed.createdAt && isNaN(Date.parse(parsed.createdAt))) {
+      throw new Error("Invalid createdAt date format");
+    }
+
+    if (parsed.updatedAt && isNaN(Date.parse(parsed.updatedAt))) {
+      throw new Error("Invalid updatedAt date format");
+    }
+
+    // Validate organizedThoughts structure
+    for (let i = 0; i < parsed.organizedThoughts.length; i++) {
+      const thought = parsed.organizedThoughts[i];
+      if (!thought || typeof thought !== "object") {
+        throw new Error(`Invalid organizedThought at index ${i}: must be an object`);
+      }
+      if (typeof thought.selected !== "boolean") {
+        throw new Error(`Invalid organizedThought at index ${i}: selected must be a boolean`);
+      }
+    }
+
     return parsed as JournalSession;
-  } catch (e) {
-    console.error("Error importing journal:", e);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      console.error("Import failed: Invalid JSON syntax", error);
+      return null;
+    }
+    if (error instanceof Error) {
+      console.error(`Import failed: ${error.message}`, error);
+      return null;
+    }
+    console.error("Import failed: Unknown error", error);
     return null;
   }
 }
@@ -366,6 +526,7 @@ export function getFileSystemTree(projectId?: string): JournalFileSystemItem[] {
   
   const folders: JournalFolder[] = [];
   const files: JournalFile[] = [];
+  const loadedFileIds = new Set<string>();
 
   // Load folders and verify they still exist in individual storage
   if (treeData) {
@@ -378,7 +539,10 @@ export function getFileSystemTree(projectId?: string): JournalFileSystemItem[] {
         if (folderData) {
           try {
             const parsedFolder = JSON.parse(folderData);
-            folders.push(parsedFolder);
+            // Validate folder structure
+            if (parsedFolder.id && parsedFolder.name && parsedFolder.path) {
+              folders.push(parsedFolder);
+            }
           } catch (e) {
             console.error("Error parsing folder:", e);
           }
@@ -389,17 +553,49 @@ export function getFileSystemTree(projectId?: string): JournalFileSystemItem[] {
     }
   }
 
-  // Load files from saved journals
+  // Load files from saved journals - this is the source of truth
   savedList.forEach((meta) => {
     const fileData = loadJournalFromStorage(meta.id);
     if (fileData) {
-      files.push({
-        ...fileData,
-        type: "file",
-        path: fileData.path || (fileData.projectId ? `/project-${fileData.projectId}` : "/"),
-      } as JournalFile);
+      // Validate file structure
+      if (fileData.id && fileData.name) {
+        const file: JournalFile = {
+          ...fileData,
+          type: "file",
+          path: fileData.path || (fileData.projectId ? `/project-${fileData.projectId}` : "/"),
+        };
+        files.push(file);
+        loadedFileIds.add(file.id);
+      }
     }
   });
+
+  // Validate consistency: ensure tree doesn't have files that don't exist
+  // This helps catch any stale entries in the centralized tree
+  if (treeData) {
+    try {
+      const parsed = JSON.parse(treeData);
+      const treeFiles = parsed.files || [];
+      const staleFileIds: string[] = [];
+      
+      treeFiles.forEach((treeFile: JournalFile) => {
+        // If a file is in the tree but not in our loaded files, it's stale
+        if (!loadedFileIds.has(treeFile.id)) {
+          staleFileIds.push(treeFile.id);
+        }
+      });
+      
+      // If we found stale entries, clean up the tree (but don't block the return)
+      if (staleFileIds.length > 0) {
+        const cleanedFiles = treeFiles.filter((f: JournalFile) => loadedFileIds.has(f.id));
+        parsed.files = cleanedFiles;
+        localStorage.setItem("journal-filesystem-tree", JSON.stringify(parsed));
+      }
+    } catch (e) {
+      // Ignore errors in cleanup, just log them
+      console.error("Error cleaning up stale tree entries:", e);
+    }
+  }
 
   // Filter by project if specified
   let items: JournalFileSystemItem[] = [...folders, ...files];
@@ -532,6 +728,31 @@ export function renameItem(id: string, newName: string, type: "file" | "folder")
       }
     }
   }
+}
+
+/**
+ * Counts the number of children (files and folders) in a folder
+ * @param folderPath - The path of the folder
+ * @returns Object with fileCount and folderCount
+ */
+export function countFolderChildren(folderPath: string): { fileCount: number; folderCount: number } {
+  if (typeof window === "undefined") return { fileCount: 0, folderCount: 0 };
+  
+  const allItems = getFileSystemTree();
+  let fileCount = 0;
+  let folderCount = 0;
+  
+  allItems.forEach((item) => {
+    if (item.path?.startsWith(folderPath + "/")) {
+      if (item.type === "folder") {
+        folderCount++;
+      } else {
+        fileCount++;
+      }
+    }
+  });
+  
+  return { fileCount, folderCount };
 }
 
 export function deleteItem(id: string, type: "file" | "folder"): void {

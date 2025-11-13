@@ -24,9 +24,10 @@ interface JournalFileExplorerProps {
   onPathChange: (path: string) => void;
   onOpenFile: (file: JournalFile) => void;
   onRename: (id: string, newName: string, type: "file" | "folder") => void;
-  onDelete: (id: string, type: "file" | "folder") => void;
+  onDelete: (id: string, type: "file" | "folder") => Promise<void>;
   onCreateFile: () => void;
   onExportCurrent?: () => void;
+  onImportCurrent?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   selectedProjectFilter: string | null;
   projects: Project[];
   currentFileId?: string | null;
@@ -48,6 +49,7 @@ export default function JournalFileExplorer({
   onDelete,
   onCreateFile,
   onExportCurrent,
+  onImportCurrent,
   selectedProjectFilter,
   projects,
   currentFileId,
@@ -73,6 +75,9 @@ export default function JournalFileExplorer({
   const [filter, setFilter] = useState<FilterOption>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name-asc");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Optimistic UI: Track items being deleted
+  const [deletingItems, setDeletingItems] = useState<Set<string>>(new Set());
 
   const isCompact = variant === "compact";
   const lastSavedLabel = lastSavedAt
@@ -84,12 +89,14 @@ export default function JournalFileExplorer({
       selectedProjectFilter === "all" || !selectedProjectFilter
         ? undefined
         : selectedProjectFilter;
-    const allItems = getFileSystemTree(projectFilter);
     const pathItems = getItemsByPath(currentPath, projectFilter);
     setItems(pathItems);
   }, [currentPath, selectedProjectFilter]);
 
+  // Load items when path or filter changes
+  // This is necessary to sync UI with file system state
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadItems();
   }, [loadItems, refreshTrigger]);
 
@@ -188,8 +195,11 @@ export default function JournalFileExplorer({
     }
   };
 
-  // Filter items
+  // Filter items (exclude items being deleted for optimistic UI)
   const filteredItems = items.filter((item) => {
+    // Optimistic UI: Hide items being deleted
+    if (deletingItems.has(item.id)) return false;
+    
     // Type filter
     if (filter === "folders" && item.type !== "folder") return false;
     if (filter === "files" && item.type !== "file") return false;
@@ -266,24 +276,99 @@ export default function JournalFileExplorer({
     }
   };
 
+  // Optimistic delete handler
+  const handleOptimisticDelete = useCallback(async (id: string, type: "file" | "folder") => {
+    // Add to deleting set immediately (optimistic UI)
+    setDeletingItems((prev) => new Set([...prev, id]));
+    
+    // Also remove from selection if selected
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
+    
+    try {
+      // Call the actual delete handler (now async)
+      await onDelete(id, type);
+      
+      // Force a fresh reload of items to ensure UI is in sync
+      // Use setTimeout to ensure deletion has completed in localStorage
+      setTimeout(() => {
+        loadItems();
+        // Remove from deleting set after refresh
+        setDeletingItems((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      }, 50);
+    } catch (error) {
+      // On error, revert optimistic update
+      setDeletingItems((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      console.error("Delete failed:", error);
+      // Reload items to restore state
+      loadItems();
+      throw error;
+    }
+  }, [onDelete, loadItems]);
+
   const handleBulkDelete = async () => {
     if (selectedItems.size === 0) return;
     
-    const confirmed = window.confirm(
-      `Are you sure you want to delete ${selectedItems.size} item(s)? This action cannot be undone.`
-    );
+    const itemsToDelete = Array.from(selectedItems)
+      .map((id) => {
+        const item = items.find((i) => i.id === id);
+        return item ? { id, name: item.name, type: item.type } : null;
+      })
+      .filter((item): item is { id: string; name: string; type: "file" | "folder" } => item !== null);
+    
+    if (itemsToDelete.length === 0) return;
+    
+    // Use confirmation modal instead of window.confirm
+    const itemNames = itemsToDelete.slice(0, 3).map((item) => item.name).join(", ");
+    const moreCount = itemsToDelete.length > 3 ? itemsToDelete.length - 3 : 0;
+    const message = itemsToDelete.length === 1
+      ? `Are you sure you want to delete "${itemsToDelete[0].name}"? This action cannot be undone.`
+      : `Are you sure you want to delete ${itemsToDelete.length} item(s)?\n\n${itemNames}${moreCount > 0 ? ` and ${moreCount} more` : ""}\n\nThis action cannot be undone.`;
+    
+    const confirmed = window.confirm(message);
     
     if (!confirmed) return;
     
-    selectedItems.forEach((itemId) => {
-      const item = items.find((i) => i.id === itemId);
-      if (item) {
-        onDelete(itemId, item.type);
-      }
+    // Optimistically remove all items
+    setDeletingItems((prev) => {
+      const newSet = new Set(prev);
+      itemsToDelete.forEach((item) => newSet.add(item.id));
+      return newSet;
     });
     
-    setSelectedItems(new Set());
-    loadItems();
+    try {
+      // Delete all items (await all deletions)
+      await Promise.all(
+        itemsToDelete.map((item) => onDelete(item.id, item.type))
+      );
+      
+      setSelectedItems(new Set());
+      
+      // Force a fresh reload after all deletions complete
+      // Use setTimeout to ensure all deletions have completed in localStorage
+      setTimeout(() => {
+        loadItems();
+        // Clear deleting state after refresh
+        setDeletingItems(new Set());
+      }, 50);
+    } catch (error) {
+      // Revert on error
+      setDeletingItems(new Set());
+      loadItems();
+      console.error("Bulk delete failed:", error);
+      alert("Failed to delete some items. Please try again.");
+    }
   };
 
   const handleBulkMove = async (targetPath: string) => {
@@ -316,10 +401,10 @@ export default function JournalFileExplorer({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b border-[#867979]/30">
+      <div className="flex items-center gap-2 mb-4 pb-4 border-b border-[#867979]/20 flex-shrink-0">
         <button
           onClick={() => onPathChange("/")}
-          className="text-[#867979] hover:text-white transition text-sm"
+          className="text-[#867979] hover:text-[#D0CCCC] transition text-sm"
         >
           Home
         </button>
@@ -331,7 +416,7 @@ export default function JournalFileExplorer({
               <span className="text-[#867979]">/</span>
               <button
                 onClick={() => navigateToPath(pathParts)}
-                className="text-[#867979] hover:text-white transition text-sm"
+                className="text-[#867979] hover:text-[#D0CCCC] transition text-sm"
               >
                 {part}
               </button>
@@ -341,7 +426,7 @@ export default function JournalFileExplorer({
       </div>
 
       {/* Toolbar */}
-      <div className={isCompact ? "space-y-2 mb-3" : "space-y-3 mb-4"}>
+      <div className={`${isCompact ? "space-y-2 mb-3" : "space-y-3 mb-4"} flex-shrink-0`}>
         {/* Top toolbar */}
         <div
           className={`flex ${
@@ -365,7 +450,7 @@ export default function JournalFileExplorer({
             </button>
             <button
               onClick={() => setShowCreateFolderModal(true)}
-              className={`px-4 py-2 bg-[#867979]/20 hover:bg-[#867979]/30 border border-[#867979]/40 rounded-lg text-[#D0CCCC] transition ${
+              className={`px-4 py-2 bg-[#867979]/20 hover:bg-[#867979]/15 border border-[#867979]/20 rounded-lg text-[#D0CCCC] transition ${
                 isCompact ? "text-xs" : "text-sm"
               }`}
             >
@@ -383,7 +468,7 @@ export default function JournalFileExplorer({
                 </button>
                 <button
                   onClick={clearSelection}
-                  className={`px-4 py-2 border border-[#867979] hover:bg-[#867979]/20 rounded-lg text-[#D0CCCC] transition ${
+                  className={`px-4 py-2 border border-[#867979] hover:bg-[#867979]/10 rounded-lg text-[#D0CCCC] transition ${
                     isCompact ? "text-xs" : "text-sm"
                   }`}
                 >
@@ -398,15 +483,41 @@ export default function JournalFileExplorer({
               isCompact ? "gap-2 flex-wrap" : "gap-3"
             }`}
           >
-            {onExportCurrent && (
-              <button
-                onClick={onExportCurrent}
-                className={`px-4 py-2 border border-[#867979] hover:bg-[#867979]/20 rounded-lg text-[#D0CCCC] transition ${
-                  isCompact ? "text-xs" : "text-sm"
-                }`}
-              >
-                Export JSON
-              </button>
+            {(onExportCurrent || onImportCurrent) && (
+              <div className="flex items-center gap-2 border border-[#867979]/20 rounded-lg overflow-hidden">
+                {onExportCurrent && (
+                  <button
+                    onClick={onExportCurrent}
+                    className={`px-3 py-2 hover:bg-[#867979]/10 text-[#D0CCCC] transition ${
+                      isCompact ? "text-xs" : "text-sm"
+                    }`}
+                    title="Export current journal as JSON"
+                  >
+                    Export
+                  </button>
+                )}
+                {onImportCurrent && (
+                  <>
+                    <div className="h-6 w-px bg-[#867979]/20" />
+                    <label className="cursor-pointer">
+                      <span
+                        className={`px-3 py-2 hover:bg-[#867979]/10 text-[#D0CCCC] transition block ${
+                          isCompact ? "text-xs" : "text-sm"
+                        }`}
+                        title="Import journal from JSON file"
+                      >
+                        Import
+                      </span>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={onImportCurrent}
+                        className="hidden"
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
             )}
             <div
               className={`${
@@ -476,7 +587,7 @@ export default function JournalFileExplorer({
           {/* Select All */}
           <button
             onClick={handleSelectAll}
-            className={`border border-[#867979] hover:bg-[#867979]/20 rounded-lg text-[#D0CCCC] transition ${
+            className={`border border-[#867979] hover:bg-[#867979]/10 rounded-lg text-[#D0CCCC] transition ${
               isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"
             }`}
           >
@@ -515,10 +626,7 @@ export default function JournalFileExplorer({
                       onRename(id, name, type);
                       loadItems();
                     }}
-                    onDelete={(id, type) => {
-                      onDelete(id, type);
-                      loadItems();
-                    }}
+                    onDelete={handleOptimisticDelete}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     projectName={project?.name}
@@ -543,10 +651,7 @@ export default function JournalFileExplorer({
                     onRename(id, name, type);
                     loadItems();
                   }}
-                  onDelete={(id, type) => {
-                    onDelete(id, type);
-                    loadItems();
-                  }}
+                  onDelete={handleOptimisticDelete}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   projectName={project?.name}
@@ -561,8 +666,8 @@ export default function JournalFileExplorer({
       {/* Create Folder Modal */}
       {showCreateFolderModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#171717] border border-[#867979] rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold mb-4 text-white">
+          <div className="bg-[#171717] border border-[#867979]/30 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold mb-4 text-[#D0CCCC]">
               Create Folder
             </h3>
             <input
@@ -595,7 +700,7 @@ export default function JournalFileExplorer({
                   handleCreateFolder();
                 }}
                 disabled={!newFolderName.trim()}
-                className="flex-1 px-4 py-2 bg-[#867979] hover:bg-[#756868] rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-[#867979] hover:bg-[#756868] text-[#D0CCCC] rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>
@@ -606,7 +711,7 @@ export default function JournalFileExplorer({
                   setShowCreateFolderModal(false);
                   setNewFolderName("");
                 }}
-                className="flex-1 px-4 py-2 border border-[#867979] rounded hover:bg-[#867979]/20 transition"
+                className="flex-1 px-4 py-2 border border-[#867979] text-[#D0CCCC] rounded hover:bg-[#867979]/10 transition"
               >
                 Cancel
               </button>

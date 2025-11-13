@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Task } from "@/types";
 
 interface TaskItemProps {
@@ -11,15 +11,24 @@ interface TaskItemProps {
 
 export default function TaskItem({ task, onUpdate, onDelete }: TaskItemProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(task.title);
-  const [editDescription, setEditDescription] = useState(
+  // Initialize edit state from task props
+  const [editTitle, setEditTitle] = useState(() => task.title);
+  const [editDescription, setEditDescription] = useState(() =>
     task.description || ""
   );
 
+  // Reset edit state when exiting edit mode or when task changes
+  // This is necessary to sync edit state with task props when not editing
+  const prevIsEditingRef = useRef(isEditing);
   useEffect(() => {
-    setEditTitle(task.title);
-    setEditDescription(task.description || "");
-  }, [task.title, task.description]);
+    if (!isEditing && (prevIsEditingRef.current !== isEditing || editTitle !== task.title || editDescription !== (task.description || ""))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEditTitle(task.title);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEditDescription(task.description || "");
+    }
+    prevIsEditingRef.current = isEditing;
+  }, [isEditing, task.title, task.description, editTitle, editDescription]);
 
   const priorityColors = {
     LOW: "bg-emerald-100 text-emerald-700",

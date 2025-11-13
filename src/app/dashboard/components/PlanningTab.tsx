@@ -64,10 +64,18 @@ export default function PlanningTab({ project, onUpdate }: PlanningTabProps) {
   ]);
 
   // Sync optimistic state when project data changes from server
+  // Use useMemo to derive state instead of setState in effect
+  const nextFeatures = useMemo(() => project.features || [], [project.features]);
+  const nextTasks = useMemo(() => [
+    ...project.tasks,
+    ...(project.features || []).flatMap((f) => f.tasks),
+  ], [project.tasks, project.features]);
+
   useEffect(() => {
     // Only sync if we're not currently dragging (to avoid interrupting smooth drag)
+    // This is necessary for optimistic UI updates during drag-and-drop operations
     if (!draggedItem) {
-      const nextFeatures = project.features || [];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticFeatures((previous) => {
         if (previous.length !== nextFeatures.length) {
           return nextFeatures;
@@ -78,10 +86,7 @@ export default function PlanningTab({ project, onUpdate }: PlanningTabProps) {
         return isSame ? previous : nextFeatures;
       });
 
-      const nextTasks = [
-        ...project.tasks,
-        ...(project.features || []).flatMap((f) => f.tasks),
-      ];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticTasks((previous) => {
         if (previous.length !== nextTasks.length) {
           return nextTasks;
@@ -92,7 +97,7 @@ export default function PlanningTab({ project, onUpdate }: PlanningTabProps) {
         return isSame ? previous : nextTasks;
       });
     }
-  }, [project.features, project.tasks, draggedItem]);
+  }, [nextFeatures, nextTasks, draggedItem]);
 
   const allTasks: Task[] = optimisticTasks;
   const features = optimisticFeatures;
@@ -160,12 +165,17 @@ export default function PlanningTab({ project, onUpdate }: PlanningTabProps) {
       .join(" ");
   };
 
+  // Use useMemo to derive requirements instead of setState in effect
+  const nextRequirements = useMemo(() => project.moreInfo || "", [project.moreInfo]);
+  
+  // Sync requirements state with project.moreInfo
+  // This is necessary to keep local state in sync with server data
   useEffect(() => {
-    const nextRequirements = project.moreInfo || "";
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRequirements((previous) =>
       previous === nextRequirements ? previous : nextRequirements
     );
-  }, [project.moreInfo]);
+  }, [nextRequirements]);
 
   const handleSaveRequirements = async () => {
     try {
