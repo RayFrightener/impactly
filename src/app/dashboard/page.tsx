@@ -258,11 +258,6 @@ function DashboardContent() {
             </p>
           </div>
 
-          {/* Journal Showcase */}
-          <div className="mb-10">
-            <JournalShowcase />
-          </div>
-
           {loading ? (
             <LoadingScreen message="Loading your projects..." />
           ) : error ? (
@@ -506,6 +501,11 @@ function DashboardContent() {
                   })}
                 </div>
               )}
+
+              {/* Journal Showcase */}
+              <div className="mt-10">
+                <JournalShowcase />
+              </div>
 
               {showCreateModal && (
                 <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">

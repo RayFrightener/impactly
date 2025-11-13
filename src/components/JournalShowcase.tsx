@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { getProjects } from "@/app/actions/projects";
-import type { ProjectWithRelations } from "@/types";
+import { createTask } from "@/app/actions/tasks";
+import {
+  createFeature,
+  getFeatures,
+  updateFeature,
+} from "@/app/actions/features";
+import { createThought } from "@/app/actions/thoughts";
+import type { ProjectWithRelations, FeatureWithTasks } from "@/types";
 import JournalTypingArea from "./JournalTypingArea";
+import {
+  createFeatureTodo,
+  parseFeatureActionItems,
+} from "@/utils/featureTodos";
 
 interface Thought {
   id: string;
@@ -12,21 +22,43 @@ interface Thought {
 }
 
 export default function JournalShowcase() {
-  const router = useRouter();
   const [currentThoughtContent, setCurrentThoughtContent] = useState("");
   const [thoughts, setThoughts] = useState<Thought[]>([]);
+  const [editingThoughtId, setEditingThoughtId] = useState<string | null>(null);
+  const [editingThoughtText, setEditingThoughtText] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null
   );
   const [projects, setProjects] = useState<ProjectWithRelations[]>([]);
-  const [isNavigating, setIsNavigating] = useState(false);
+  const [projectFeatures, setProjectFeatures] = useState<
+    Array<FeatureWithTasks & { actionItems?: unknown }>
+  >([]);
   const [selectedText, setSelectedText] = useState<string>("");
+  const [selectionPosition, setSelectionPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const [extractedText, setExtractedText] = useState<string>("");
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [extractType, setExtractType] = useState<
     "action-item" | "requirement" | "feature" | "improvement"
   >("action-item");
+
+  // Extraction form fields
+  const [featureDescription, setFeatureDescription] = useState<string>("");
+  const [featureImpact, setFeatureImpact] = useState<string>("");
+  const [improvementMode, setImprovementMode] = useState<"existing" | "new">(
+    "existing"
+  );
+  const [improvementFeatureId, setImprovementFeatureId] = useState<string>("");
+  const [improvementFeatureName, setImprovementFeatureName] =
+    useState<string>("");
+  const [improvementNotes, setImprovementNotes] = useState<string>("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
+  const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load projects
   useEffect(() => {
@@ -41,7 +73,37 @@ export default function JournalShowcase() {
     loadProjects();
   }, []);
 
-  // Handle text selection - only within journal showcase
+  // Load project features when project is selected
+  useEffect(() => {
+    async function loadFeatures() {
+      if (!selectedProjectId) {
+        setProjectFeatures([]);
+        return;
+      }
+
+      try {
+        const features = await getFeatures(selectedProjectId);
+        setProjectFeatures(
+          features as Array<FeatureWithTasks & { actionItems?: unknown }>
+        );
+
+        // Set default improvement mode and feature
+        if (features.length > 0) {
+          setImprovementMode("existing");
+          setImprovementFeatureId(features[0].id);
+        } else {
+          setImprovementMode("new");
+          setImprovementFeatureId("");
+        }
+      } catch (err) {
+        console.error("Error loading features:", err);
+        setProjectFeatures([]);
+      }
+    }
+    loadFeatures();
+  }, [selectedProjectId]);
+
+  // Handle text selection - works with both thoughts and textarea
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -49,68 +111,74 @@ export default function JournalShowcase() {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) {
         setSelectedText("");
+        setSelectionPosition(null);
         return;
       }
 
       const range = selection.getRangeAt(0);
-      const container = containerRef.current;
-
-      // Check if selection is within the journal showcase container
-      if (!container) {
-        setSelectedText("");
-        return;
-      }
-
-      // Check if the selection's common ancestor is within our container
-      const commonAncestor = range.commonAncestorContainer;
-      if (!(commonAncestor instanceof Node)) {
-        setSelectedText("");
-        return;
-      }
-
-      // Check if the selection is within the journal showcase container
-      if (!container.contains(commonAncestor) && container !== commonAncestor) {
-        setSelectedText("");
-        return;
-      }
-
       const selectedTextContent = selection.toString().trim();
+
       if (selectedTextContent.length === 0) {
         setSelectedText("");
+        setSelectionPosition(null);
+        return;
+      }
+
+      const startContainer = range.startContainer;
+      const container = containerRef.current;
+
+      if (!container) return;
+
+      // Check if selection is in a thought content div
+      const thoughtContentDivs = Array.from(
+        container.querySelectorAll(".select-text.font-mono.whitespace-pre-wrap")
+      );
+      let isInThought = false;
+      for (const thoughtDiv of thoughtContentDivs) {
+        if (
+          thoughtDiv.contains(startContainer) ||
+          thoughtDiv === startContainer
+        ) {
+          isInThought = true;
+          break;
+        }
+      }
+
+      // Check if selection is within textarea
+      let isInTextarea = false;
+      const textarea = container.querySelector("textarea");
+      if (textarea) {
+        if (textarea.contains(startContainer) || textarea === startContainer) {
+          isInTextarea = true;
+        }
+      }
+
+      // Only proceed if selection is in allowed areas (thought divs or textarea)
+      if (!isInTextarea && !isInThought) {
+        setSelectedText("");
+        setSelectionPosition(null);
         return;
       }
 
       setSelectedText(selectedTextContent);
+
+      // Get position for quick actions menu (using viewport coordinates for fixed positioning)
+      const rect = range.getBoundingClientRect();
+      setSelectionPosition({
+        top: rect.bottom + 10,
+        left: rect.left,
+      });
     };
 
-    document.addEventListener("selectionchange", handleSelection);
-    return () =>
-      document.removeEventListener("selectionchange", handleSelection);
+    const element = containerRef.current;
+    element.addEventListener("mouseup", handleSelection);
+    element.addEventListener("keyup", handleSelection);
+
+    return () => {
+      element.removeEventListener("mouseup", handleSelection);
+      element.removeEventListener("keyup", handleSelection);
+    };
   }, []);
-
-  const handleContinueToJournal = () => {
-    const content = currentThoughtContent.trim();
-    if (!content || isNavigating) return;
-
-    setIsNavigating(true);
-
-    // Store content in localStorage with a unique key
-    const timestamp = Date.now();
-    const storageKey = `journal-dashboard-${timestamp}`;
-    localStorage.setItem(storageKey, content);
-
-    if (selectedProjectId) {
-      localStorage.setItem(`${storageKey}-projectId`, selectedProjectId);
-    }
-
-    // Navigate to journal page with query params
-    const projectParam = selectedProjectId
-      ? `&projectId=${encodeURIComponent(selectedProjectId)}`
-      : "";
-    router.push(
-      `/journal?fromDashboard=true&contentKey=${timestamp}${projectParam}`
-    );
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const content = currentThoughtContent.trim();
@@ -128,22 +196,170 @@ export default function JournalShowcase() {
     // Regular Enter: allow default behavior (newline)
   };
 
-  const handleExtractClick = (
-    type: "action-item" | "requirement" | "feature" | "improvement"
-  ) => {
-    if (selectedText) {
-      setExtractedText(selectedText);
-      setExtractType(type);
-      setShowExtractModal(true);
-      window.getSelection()?.removeAllRanges();
-      setSelectedText("");
+  const handleEditThought = (thoughtId: string) => {
+    const thought = thoughts.find((t) => t.id === thoughtId);
+    if (thought) {
+      setEditingThoughtId(thoughtId);
+      setEditingThoughtText(thought.content);
     }
   };
 
-  const showContinueButton = currentThoughtContent.trim().length > 0;
+  const handleSaveEditedThought = (thoughtId: string) => {
+    setThoughts((prev) =>
+      prev.map((t) =>
+        t.id === thoughtId ? { ...t, content: editingThoughtText } : t
+      )
+    );
+    setEditingThoughtId(null);
+    setEditingThoughtText("");
+  };
+
+  const handleDeleteThought = (thoughtId: string) => {
+    setThoughts((prev) => prev.filter((t) => t.id !== thoughtId));
+  };
+
+  const handleExtractClick = (
+    type: "action-item" | "requirement" | "feature" | "improvement"
+  ) => {
+    if (!selectedProjectId) {
+      setExtractError("Please select a project first");
+      setTimeout(() => setExtractError(null), 3000);
+      return;
+    }
+
+    if (selectedText) {
+      setExtractedText(selectedText);
+      setExtractType(type);
+
+      // Set improvement mode based on available features
+      if (type === "improvement") {
+        if (projectFeatures.length > 0) {
+          setImprovementMode("existing");
+          setImprovementFeatureId(projectFeatures[0].id);
+        } else {
+          setImprovementMode("new");
+          setImprovementFeatureId("");
+        }
+      }
+
+      setShowExtractModal(true);
+      window.getSelection()?.removeAllRanges();
+      setSelectedText("");
+      setSelectionPosition(null);
+    }
+  };
+
+  const handleExtract = async () => {
+    if (!selectedProjectId || !extractedText.trim()) {
+      setExtractError("Project selection and text are required");
+      return;
+    }
+
+    setIsExtracting(true);
+    setExtractError(null);
+
+    try {
+      if (extractType === "action-item") {
+        await createTask({
+          title: extractedText,
+          status: "TODO",
+          priority: "MEDIUM",
+          projectId: selectedProjectId,
+        });
+      } else if (extractType === "requirement") {
+        await createThought({
+          text: extractedText,
+          projectId: selectedProjectId,
+        });
+      } else if (extractType === "feature") {
+        await createFeature({
+          name: extractedText,
+          description: featureDescription.trim() || "",
+          impact: featureImpact.trim() || "",
+          status: "IDEA",
+          priority: projectFeatures.length,
+          projectId: selectedProjectId,
+        });
+      } else if (extractType === "improvement") {
+        if (improvementMode === "existing" && improvementFeatureId) {
+          // Add improvement to existing feature
+          const feature = projectFeatures.find(
+            (f) => f.id === improvementFeatureId
+          );
+          if (feature) {
+            const currentActionItems = parseFeatureActionItems(
+              (feature.actionItems as unknown as
+                | Array<string | import("@/types").FeatureTodoItem>
+                | null
+                | undefined) ?? []
+            );
+            const improvementText = extractedText.trim();
+            const notes = improvementNotes.trim();
+            const combinedText = notes
+              ? `${improvementText} — ${notes}`
+              : improvementText;
+            const newTodo = createFeatureTodo(combinedText);
+
+            await updateFeature(improvementFeatureId, {
+              actionItems: [...currentActionItems, newTodo],
+            });
+          }
+        } else {
+          // Create new feature with improvement
+          const improvementText = extractedText.trim();
+          const notes = improvementNotes.trim();
+          const featureName = improvementFeatureName.trim() || improvementText;
+          const description =
+            notes || `Improvement captured: ${improvementText}`;
+          const newTodo = createFeatureTodo(
+            notes ? `${improvementText} — ${notes}` : improvementText
+          );
+
+          await createFeature({
+            name: featureName,
+            description,
+            impact: "Improvement captured via journal",
+            status: "IDEA",
+            priority: projectFeatures.length,
+            projectId: selectedProjectId,
+            actionItems: [newTodo],
+          });
+        }
+      }
+
+      // Reset extraction state
+      setShowExtractModal(false);
+      setExtractedText("");
+      setFeatureDescription("");
+      setFeatureImpact("");
+      setImprovementFeatureName("");
+      setImprovementNotes("");
+      setImprovementMode(projectFeatures.length > 0 ? "existing" : "new");
+      setImprovementFeatureId(
+        projectFeatures.length > 0 ? projectFeatures[0]?.id || "" : ""
+      );
+
+      // Reload features to update the list
+      if (selectedProjectId) {
+        const features = await getFeatures(selectedProjectId);
+        setProjectFeatures(
+          features as Array<FeatureWithTasks & { actionItems?: unknown }>
+        );
+      }
+    } catch (err) {
+      console.error("Error extracting:", err);
+      setExtractError(
+        err instanceof Error ? err.message : "Failed to extract item"
+      );
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   const placeholder =
-    currentThoughtContent === "" ? "Start typing your thoughts..." : "";
+    thoughts.length === 0 && currentThoughtContent === ""
+      ? "Start typing your thoughts... Press Shift+Enter to commit a thought"
+      : "";
 
   return (
     <div
@@ -154,7 +370,7 @@ export default function JournalShowcase() {
       {projects.length > 0 && (
         <div className="px-8 pt-6 pb-4 border-b border-[#D0CCCC]/30">
           <label className="block text-sm text-[#D0CCCC] mb-2">
-            Select Project (optional)
+            Select Project
           </label>
           <select
             value={selectedProjectId || ""}
@@ -176,9 +392,16 @@ export default function JournalShowcase() {
         className="px-8 py-12 flex flex-col overflow-hidden relative"
         style={{ minHeight: "400px", maxHeight: "600px" }}
       >
-        {/* Selection Quick Actions - Positioned at top center */}
-        {selectedText && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-[#867979] rounded-lg p-2 flex gap-2 shadow-lg">
+        {/* Selection Quick Actions - Positioned relative to selection */}
+        {selectedText && selectionPosition && (
+          <div
+            className="fixed z-50 rounded-lg p-2 flex gap-2 shadow-lg"
+            style={{
+              backgroundColor: "#867979",
+              top: `${selectionPosition.top}px`,
+              left: `${selectionPosition.left}px`,
+            }}
+          >
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -186,7 +409,7 @@ export default function JournalShowcase() {
                 handleExtractClick("action-item");
               }}
               onMouseDown={(e) => e.preventDefault()}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition"
+              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition text-white"
             >
               Extract as Action
             </button>
@@ -197,7 +420,7 @@ export default function JournalShowcase() {
                 handleExtractClick("requirement");
               }}
               onMouseDown={(e) => e.preventDefault()}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition"
+              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition text-white"
             >
               Extract as Requirement
             </button>
@@ -208,7 +431,7 @@ export default function JournalShowcase() {
                 handleExtractClick("feature");
               }}
               onMouseDown={(e) => e.preventDefault()}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition"
+              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition text-white"
             >
               Extract as Feature
             </button>
@@ -219,7 +442,7 @@ export default function JournalShowcase() {
                 handleExtractClick("improvement");
               }}
               onMouseDown={(e) => e.preventDefault()}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition"
+              className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition text-white"
             >
               Extract as Improvement
             </button>
@@ -228,13 +451,21 @@ export default function JournalShowcase() {
                 e.preventDefault();
                 e.stopPropagation();
                 setSelectedText("");
+                setSelectionPosition(null);
                 window.getSelection()?.removeAllRanges();
               }}
               onMouseDown={(e) => e.preventDefault()}
-              className="px-2 py-1 text-[#867979] hover:text-white transition"
+              className="px-2 py-1 text-white/70 hover:text-white transition"
             >
               ×
             </button>
+          </div>
+        )}
+
+        {/* Error message */}
+        {extractError && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-red-600 text-white px-4 py-2 rounded-lg text-sm">
+            {extractError}
           </div>
         )}
 
@@ -268,22 +499,121 @@ export default function JournalShowcase() {
                       "rgba(134, 121, 121, 0.1)";
                   }}
                 >
-                  <div className="flex items-start gap-2">
-                    {/* Thought content */}
-                    <div
-                      className="flex-1 font-mono leading-relaxed whitespace-pre-wrap select-text"
-                      style={{
-                        color: "#D0CCCC",
-                        fontSize: "18px",
-                        userSelect: "text",
-                        cursor: "text",
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {thought.content}
+                  {editingThoughtId === thought.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        ref={editingTextareaRef}
+                        value={editingThoughtText}
+                        onChange={(e) => setEditingThoughtText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.shiftKey) {
+                            e.preventDefault();
+                            handleSaveEditedThought(thought.id);
+                          } else if (e.key === "Escape") {
+                            setEditingThoughtId(null);
+                            setEditingThoughtText("");
+                          }
+                        }}
+                        className="w-full rounded p-2 font-mono text-lg leading-relaxed resize-none focus:outline-none"
+                        style={{
+                          backgroundColor: "#171717",
+                          border: "1px solid #867979",
+                          color: "#D0CCCC",
+                        }}
+                        rows={Math.max(
+                          3,
+                          editingThoughtText.split("\n").length
+                        )}
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs" style={{ color: "#867979" }}>
+                          Shift+Enter to save, Escape to cancel
+                        </div>
+                        <button
+                          onClick={() => handleSaveEditedThought(thought.id)}
+                          className="px-3 py-1 text-xs rounded text-white transition"
+                          style={{
+                            backgroundColor: "#867979",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#756868";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#867979";
+                          }}
+                        >
+                          Save
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-2">
+                        {/* Thought content */}
+                        <div
+                          className="flex-1 font-mono leading-relaxed whitespace-pre-wrap select-text"
+                          style={{
+                            color: "#D0CCCC",
+                            fontSize: "18px",
+                            userSelect: "text",
+                            cursor: "text",
+                            wordBreak: "break-word",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {thought.content}
+                        </div>
+                      </div>
+                      {/* Edit/Delete buttons - appear on hover */}
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditThought(thought.id);
+                          }}
+                          className="p-1 text-xs rounded-full transition"
+                          style={{
+                            backgroundColor: "rgba(134, 121, 121, 0.3)",
+                            color: "#D0CCCC",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "rgba(134, 121, 121, 0.5)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "rgba(134, 121, 121, 0.3)";
+                          }}
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteThought(thought.id);
+                          }}
+                          className="p-1 text-xs rounded-full transition"
+                          style={{
+                            backgroundColor: "rgba(239, 68, 68, 0.2)",
+                            color: "#f87171",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "rgba(239, 68, 68, 0.3)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "rgba(239, 68, 68, 0.2)";
+                          }}
+                          title="Delete"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -302,69 +632,12 @@ export default function JournalShowcase() {
         </div>
       </div>
 
-      {/* Hint Text and Continue Button */}
+      {/* Bottom hint */}
       <div className="px-8 py-4 border-t border-[#D0CCCC]/30">
-        {showContinueButton ? (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={handleContinueToJournal}
-              disabled={isNavigating}
-              className="px-8 py-3 bg-[#D0CCCC] hover:bg-white text-[#171717] rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-in fade-in duration-300"
-            >
-              {isNavigating ? (
-                <>
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Opening Journal...
-                </>
-              ) : (
-                <>
-                  Continue in Journal
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </>
-              )}
-            </button>
-            <p className="text-xs text-[#D0CCCC]">
-              Enter to wrap text · Shift+Enter to continue · Your thought will
-              be saved as a new journal entry
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-[#D0CCCC] text-center">
-            Enter to wrap text · Type your thoughts, then press Shift+Enter to
-            continue to Journal
-          </p>
-        )}
+        <p className="text-sm text-[#D0CCCC] text-center">
+          Enter to wrap text · Shift+Enter to commit thought · Select text to
+          extract
+        </p>
       </div>
 
       {/* Extraction Modal */}
@@ -407,15 +680,8 @@ export default function JournalShowcase() {
                   backgroundColor: "rgba(134, 121, 121, 0.1)",
                 }}
               >
-                {extractedText ||
-                  "Select a piece of your thought and then add that Extract as action item"}
+                {extractedText}
               </p>
-              {!extractedText && (
-                <p className="text-xs mt-2 italic" style={{ color: "#867979" }}>
-                  Select a piece of your thought and then add that Extract as
-                  action item
-                </p>
-              )}
             </div>
 
             {extractType === "feature" && (
@@ -428,6 +694,8 @@ export default function JournalShowcase() {
                     Description (optional)
                   </label>
                   <textarea
+                    value={featureDescription}
+                    onChange={(e) => setFeatureDescription(e.target.value)}
                     placeholder="Add more details about this feature..."
                     rows={3}
                     className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
@@ -446,6 +714,8 @@ export default function JournalShowcase() {
                     Impact (optional)
                   </label>
                   <textarea
+                    value={featureImpact}
+                    onChange={(e) => setFeatureImpact(e.target.value)}
                     placeholder="How does this create impact?"
                     rows={2}
                     className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
@@ -469,6 +739,20 @@ export default function JournalShowcase() {
                     Link to Feature
                   </label>
                   <select
+                    value={
+                      improvementMode === "existing"
+                        ? improvementFeatureId
+                        : "__new"
+                    }
+                    onChange={(e) => {
+                      if (e.target.value === "__new") {
+                        setImprovementMode("new");
+                        setImprovementFeatureId("");
+                      } else {
+                        setImprovementMode("existing");
+                        setImprovementFeatureId(e.target.value);
+                      }
+                    }}
                     className="w-full px-4 py-3 rounded-lg focus:outline-none"
                     style={{
                       backgroundColor: "#171717",
@@ -477,10 +761,37 @@ export default function JournalShowcase() {
                     }}
                   >
                     <option value="__new">Create new feature</option>
-                    <option value="feature-1">User Onboarding</option>
-                    <option value="feature-2">Dashboard</option>
+                    {projectFeatures.map((feature) => (
+                      <option key={feature.id} value={feature.id}>
+                        {feature.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
+                {improvementMode === "new" && (
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "#D0CCCC" }}
+                    >
+                      Feature Name
+                    </label>
+                    <input
+                      type="text"
+                      value={improvementFeatureName}
+                      onChange={(e) =>
+                        setImprovementFeatureName(e.target.value)
+                      }
+                      placeholder="Name for the new feature..."
+                      className="w-full px-4 py-3 rounded-lg focus:outline-none"
+                      style={{
+                        backgroundColor: "#171717",
+                        border: "1px solid #867979",
+                        color: "#D0CCCC",
+                      }}
+                    />
+                  </div>
+                )}
                 <div>
                   <label
                     className="block text-sm font-medium mb-2"
@@ -489,6 +800,8 @@ export default function JournalShowcase() {
                     Improvement Notes (optional)
                   </label>
                   <textarea
+                    value={improvementNotes}
+                    onChange={(e) => setImprovementNotes(e.target.value)}
                     placeholder="Add context or acceptance criteria for this improvement..."
                     rows={3}
                     className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
@@ -502,45 +815,66 @@ export default function JournalShowcase() {
               </div>
             )}
 
+            {extractError && (
+              <div
+                className="mb-4 p-3 rounded text-sm"
+                style={{
+                  backgroundColor: "rgba(239, 68, 68, 0.2)",
+                  color: "#f87171",
+                }}
+              >
+                {extractError}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  // Visual demo only - just close the modal
-                  setShowExtractModal(false);
-                  setExtractedText("");
-                  setSelectedText("");
-                }}
-                className="flex-1 px-4 py-2 rounded transition"
+                onClick={handleExtract}
+                disabled={isExtracting || !selectedProjectId}
+                className="flex-1 px-4 py-2 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: "#867979",
                   color: "#ffffff",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#756868";
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = "#756868";
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#867979";
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = "#867979";
+                  }
                 }}
               >
-                Extract
+                {isExtracting ? "Extracting..." : "Extract"}
               </button>
               <button
                 onClick={() => {
                   setShowExtractModal(false);
                   setExtractedText("");
-                  setSelectedText("");
+                  setFeatureDescription("");
+                  setFeatureImpact("");
+                  setImprovementFeatureName("");
+                  setImprovementNotes("");
+                  setExtractError(null);
                 }}
-                className="flex-1 px-4 py-2 border rounded transition"
+                disabled={isExtracting}
+                className="flex-1 px-4 py-2 border rounded transition disabled:opacity-50"
                 style={{
                   borderColor: "#867979",
                   color: "#D0CCCC",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "rgba(134, 121, 121, 0.2)";
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor =
+                      "rgba(134, 121, 121, 0.2)";
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }
                 }}
               >
                 Cancel
