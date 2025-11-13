@@ -38,7 +38,12 @@ interface JournalFileExplorerProps {
   refreshTrigger?: number;
 }
 
-type SortOption = "name-asc" | "name-desc" | "date-newest" | "date-oldest" | "type";
+type SortOption =
+  | "name-asc"
+  | "name-desc"
+  | "date-newest"
+  | "date-oldest"
+  | "type";
 type FilterOption = "all" | "folders" | "files";
 
 export default function JournalFileExplorer({
@@ -69,13 +74,13 @@ export default function JournalFileExplorer({
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  
+
   // Selection state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<FilterOption>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name-asc");
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Optimistic UI: Track items being deleted
   const [deletingItems, setDeletingItems] = useState<Set<string>>(new Set());
 
@@ -158,8 +163,7 @@ export default function JournalFileExplorer({
 
     try {
       const projectId =
-        selectedProjectFilter &&
-        selectedProjectFilter !== "all"
+        selectedProjectFilter && selectedProjectFilter !== "all"
           ? selectedProjectFilter
           : undefined;
 
@@ -199,17 +203,17 @@ export default function JournalFileExplorer({
   const filteredItems = items.filter((item) => {
     // Optimistic UI: Hide items being deleted
     if (deletingItems.has(item.id)) return false;
-    
+
     // Type filter
     if (filter === "folders" && item.type !== "folder") return false;
     if (filter === "files" && item.type !== "file") return false;
-    
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return item.name?.toLowerCase().includes(query) ?? false;
     }
-    
+
     return true;
   });
 
@@ -221,18 +225,25 @@ export default function JournalFileExplorer({
       case "name-desc":
         return (b.name || "").localeCompare(a.name || "");
       case "date-newest":
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
       case "date-oldest":
-        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        return (
+          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+        );
       case "type":
-        if (a.type === b.type) return (a.name || "").localeCompare(b.name || "");
+        if (a.type === b.type)
+          return (a.name || "").localeCompare(b.name || "");
         return a.type === "folder" ? -1 : 1;
       default:
         return 0;
     }
   });
 
-  const folders = sortedItems.filter((i) => i.type === "folder") as JournalFolder[];
+  const folders = sortedItems.filter(
+    (i) => i.type === "folder"
+  ) as JournalFolder[];
   const files = sortedItems.filter((i) => i.type === "file") as JournalFile[];
 
   // Selection handlers
@@ -252,11 +263,13 @@ export default function JournalFileExplorer({
       // Range select with Shift
       const currentIndex = sortedItems.findIndex((item) => item.id === itemId);
       const lastSelectedId = Array.from(selectedItems)[selectedItems.size - 1];
-      const lastIndex = sortedItems.findIndex((item) => item.id === lastSelectedId);
-      
+      const lastIndex = sortedItems.findIndex(
+        (item) => item.id === lastSelectedId
+      );
+
       const start = Math.min(currentIndex, lastIndex);
       const end = Math.max(currentIndex, lastIndex);
-      
+
       const newSet = new Set(selectedItems);
       for (let i = start; i <= end; i++) {
         newSet.add(sortedItems[i].id);
@@ -277,84 +290,98 @@ export default function JournalFileExplorer({
   };
 
   // Optimistic delete handler
-  const handleOptimisticDelete = useCallback(async (id: string, type: "file" | "folder") => {
-    // Add to deleting set immediately (optimistic UI)
-    setDeletingItems((prev) => new Set([...prev, id]));
-    
-    // Also remove from selection if selected
-    setSelectedItems((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
-    
-    try {
-      // Call the actual delete handler (now async)
-      await onDelete(id, type);
-      
-      // Force a fresh reload of items to ensure UI is in sync
-      // Use setTimeout to ensure deletion has completed in localStorage
-      setTimeout(() => {
-        loadItems();
-        // Remove from deleting set after refresh
+  const handleOptimisticDelete = useCallback(
+    async (id: string, type: "file" | "folder") => {
+      // Add to deleting set immediately (optimistic UI)
+      setDeletingItems((prev) => new Set([...prev, id]));
+
+      // Also remove from selection if selected
+      setSelectedItems((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+
+      try {
+        // Call the actual delete handler (now async)
+        await onDelete(id, type);
+
+        // Force a fresh reload of items to ensure UI is in sync
+        // Use setTimeout to ensure deletion has completed in localStorage
+        setTimeout(() => {
+          loadItems();
+          // Remove from deleting set after refresh
+          setDeletingItems((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(id);
+            return newSet;
+          });
+        }, 50);
+      } catch (error) {
+        // On error, revert optimistic update
         setDeletingItems((prev) => {
           const newSet = new Set(prev);
           newSet.delete(id);
           return newSet;
         });
-      }, 50);
-    } catch (error) {
-      // On error, revert optimistic update
-      setDeletingItems((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
-      console.error("Delete failed:", error);
-      // Reload items to restore state
-      loadItems();
-      throw error;
-    }
-  }, [onDelete, loadItems]);
+        console.error("Delete failed:", error);
+        // Reload items to restore state
+        loadItems();
+        throw error;
+      }
+    },
+    [onDelete, loadItems]
+  );
 
   const handleBulkDelete = async () => {
     if (selectedItems.size === 0) return;
-    
+
     const itemsToDelete = Array.from(selectedItems)
       .map((id) => {
         const item = items.find((i) => i.id === id);
         return item ? { id, name: item.name, type: item.type } : null;
       })
-      .filter((item): item is { id: string; name: string; type: "file" | "folder" } => item !== null);
-    
+      .filter(
+        (item): item is { id: string; name: string; type: "file" | "folder" } =>
+          item !== null
+      );
+
     if (itemsToDelete.length === 0) return;
-    
+
     // Use confirmation modal instead of window.confirm
-    const itemNames = itemsToDelete.slice(0, 3).map((item) => item.name).join(", ");
+    const itemNames = itemsToDelete
+      .slice(0, 3)
+      .map((item) => item.name)
+      .join(", ");
     const moreCount = itemsToDelete.length > 3 ? itemsToDelete.length - 3 : 0;
-    const message = itemsToDelete.length === 1
-      ? `Are you sure you want to delete "${itemsToDelete[0].name}"? This action cannot be undone.`
-      : `Are you sure you want to delete ${itemsToDelete.length} item(s)?\n\n${itemNames}${moreCount > 0 ? ` and ${moreCount} more` : ""}\n\nThis action cannot be undone.`;
-    
+    const message =
+      itemsToDelete.length === 1
+        ? `Are you sure you want to delete "${itemsToDelete[0].name}"? This action cannot be undone.`
+        : `Are you sure you want to delete ${
+            itemsToDelete.length
+          } item(s)?\n\n${itemNames}${
+            moreCount > 0 ? ` and ${moreCount} more` : ""
+          }\n\nThis action cannot be undone.`;
+
     const confirmed = window.confirm(message);
-    
+
     if (!confirmed) return;
-    
+
     // Optimistically remove all items
     setDeletingItems((prev) => {
       const newSet = new Set(prev);
       itemsToDelete.forEach((item) => newSet.add(item.id));
       return newSet;
     });
-    
+
     try {
       // Delete all items (await all deletions)
       await Promise.all(
         itemsToDelete.map((item) => onDelete(item.id, item.type))
       );
-      
+
       setSelectedItems(new Set());
-      
+
       // Force a fresh reload after all deletions complete
       // Use setTimeout to ensure all deletions have completed in localStorage
       setTimeout(() => {
@@ -373,14 +400,14 @@ export default function JournalFileExplorer({
 
   const handleBulkMove = async (targetPath: string) => {
     if (selectedItems.size === 0) return;
-    
+
     selectedItems.forEach((itemId) => {
       const item = items.find((i) => i.id === itemId);
       if (item) {
         moveItem(itemId, targetPath, item.type);
       }
     });
-    
+
     setSelectedItems(new Set());
     loadItems();
   };
@@ -426,7 +453,11 @@ export default function JournalFileExplorer({
       </div>
 
       {/* Toolbar */}
-      <div className={`${isCompact ? "space-y-2 mb-3" : "space-y-3 mb-4"} flex-shrink-0`}>
+      <div
+        className={`${
+          isCompact ? "space-y-2 mb-3" : "space-y-3 mb-4"
+        } flex-shrink-0`}
+      >
         {/* Top toolbar */}
         <div
           className={`flex ${
@@ -435,9 +466,7 @@ export default function JournalFileExplorer({
         >
           <div
             className={`flex ${
-              isCompact
-                ? "flex-wrap gap-2"
-                : "items-center gap-2"
+              isCompact ? "flex-wrap gap-2" : "items-center gap-2"
             }`}
           >
             <button
@@ -531,19 +560,16 @@ export default function JournalFileExplorer({
 
         {selectedItems.size > 0 && (
           <div
-            className={`${
-              isCompact ? "text-xs" : "text-sm"
-            } text-[#867979]`}
+            className={`${isCompact ? "text-xs" : "text-sm"} text-[#867979]`}
           >
-            {selectedItems.size} item{selectedItems.size !== 1 ? "s" : ""} selected
+            {selectedItems.size} item{selectedItems.size !== 1 ? "s" : ""}{" "}
+            selected
           </div>
         )}
 
         {/* Filters and Search */}
         <div
-          className={`flex flex-wrap gap-3 ${
-            isCompact ? "" : "items-center"
-          }`}
+          className={`flex flex-wrap gap-3 ${isCompact ? "" : "items-center"}`}
         >
           {/* Search */}
           <input
@@ -591,7 +617,9 @@ export default function JournalFileExplorer({
               isCompact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"
             }`}
           >
-            {selectedItems.size === sortedItems.length ? "Deselect All" : "Select All"}
+            {selectedItems.size === sortedItems.length
+              ? "Deselect All"
+              : "Select All"}
           </button>
         </div>
       </div>
