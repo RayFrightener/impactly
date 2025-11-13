@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import SignOut from "@/components/sign-out";
 import ThemeCustomizer from "@/components/theme/ThemeCustomizer";
-import { useTheme } from "@/components/theme/ThemeProvider";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,21 +11,6 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
-  const { previewPreset } = useTheme();
-
-  // Revert any preview when theme modal closes
-  useEffect(() => {
-    if (!isThemeModalOpen) {
-      previewPreset(null);
-    }
-  }, [isThemeModalOpen, previewPreset]);
-
-  // Revert any preview when main settings modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      previewPreset(null);
-    }
-  }, [isOpen, previewPreset]);
 
   // Handle Escape key
   useEffect(() => {
@@ -106,10 +90,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </h3>
               <button
                 type="button"
-                onClick={() => {
-                  previewPreset(null);
-                  setIsThemeModalOpen(false);
-                }}
+                onClick={() => setIsThemeModalOpen(false)}
                 className="text-2xl leading-none text-text-secondary transition hover:text-text-primary"
                 aria-label="Close theme modal"
               >

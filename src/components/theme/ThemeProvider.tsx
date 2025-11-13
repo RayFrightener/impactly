@@ -288,6 +288,12 @@ export const ThemeProvider = ({
           committedTokensRef.current.base
         );
         document.documentElement.dataset.theme = committedTokensRef.current.presetId;
+        // Dispatch event for instant component reactivity on revert
+        dispatchThemeChange(
+          committedTokensRef.current.presetId,
+          committedTokensRef.current.tokens,
+          committedTokensRef.current.base
+        );
         void document.documentElement.offsetHeight;
       }
       return;
@@ -299,6 +305,9 @@ export const ThemeProvider = ({
       // Apply preview tokens without saving or updating state
       applyTokens(preset.tokens, preset.base);
       document.documentElement.dataset.theme = id;
+      // Dispatch theme change event immediately for instant component reactivity on hover
+      dispatchThemeChange(id, preset.tokens, preset.base);
+      // Force a synchronous style recalculation to ensure browser paints immediately
       void document.documentElement.offsetHeight;
     }
   };

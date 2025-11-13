@@ -215,25 +215,25 @@ function DashboardContent() {
             {/* Left Navigation */}
             <button
               onClick={() => router.push("/roadmap")}
-              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
+              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
             >
               🗺️ Roadmap
             </button>
             <button
               onClick={() => router.push("/dashboard/insights")}
-              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
+              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
             >
               📊 View Insights
             </button>
             <button
               onClick={() => router.push("/journal")}
-              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
+              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
             >
               ✍️ Journal
             </button>
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
+              className="px-4 py-2 bg-button text-button-text rounded-lg hover:opacity-90 transition font-medium shadow-sm"
             >
               ⚙️ Settings
             </button>
@@ -247,7 +247,7 @@ function DashboardContent() {
               </h1>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-[#6366f1] text-white px-10 py-4 rounded-2xl hover:bg-[#818cf8] transition-all duration-200 font-bold text-xl flex items-center gap-4 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-100 transform"
+                className="bg-button text-button-text px-10 py-4 rounded-2xl hover:opacity-90 transition-all duration-200 font-bold text-xl flex items-center gap-4 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-100 transform"
               >
                 <span className="text-3xl font-light">+</span>
                 Create New Project
@@ -349,7 +349,7 @@ function DashboardContent() {
                               {project.name}
                             </h3>
                             <div className="flex flex-col items-end gap-1">
-                              <span className="text-xs px-2 py-1 bg-[#6366f1] group-hover:bg-[#818cf8] text-white rounded-full capitalize transition-colors font-medium">
+                              <span className="text-xs px-2 py-1 bg-button group-hover:opacity-90 text-button-text rounded-full capitalize transition-colors font-medium">
                                 {project.status}
                               </span>
                               {stats.hasActivity &&

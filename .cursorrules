@@ -429,3 +429,193 @@ This ensures plans are:
 
 This keeps documentation organized and separate from source code.
 
+## Color & Theme Management Rules
+
+**CRITICAL: ALL colors must be managed through the theme system. NEVER hardcode colors in components.**
+
+This app uses a centralized theme system that allows users to customize colors. All color changes must go through theme tokens, not direct color values in component code.
+
+### Theme System Architecture
+
+The app has two levels of color management:
+
+1. **Design Tokens** (`src/styles/design-tokens.ts`):
+   - Base color palette (primary, accent, neutral, success, warning, error)
+   - Used for semantic color references
+   - Provides color scales (50-900) for each color family
+
+2. **Theme Tokens** (`src/components/theme/types.ts`):
+   - Runtime theme tokens that users can customize
+   - Managed through `ThemeProvider` (`src/components/theme/ThemeProvider.tsx`)
+   - Theme presets defined in `src/components/theme/theme-presets.ts`
+   - Includes: `background`, `surface`, `card`, `border`, `textPrimary`, `textSecondary`, `button`, `buttonText`, `accent`, etc.
+
+### Rules for Color Changes
+
+**❌ NEVER do this:**
+```typescript
+// ❌ BAD - Hardcoded colors in components
+<button style={{ backgroundColor: "#3B82F6", color: "#ffffff" }}>
+  Click me
+</button>
+
+// ❌ BAD - Hardcoded colors in CSS/Tailwind
+<div className="bg-blue-500 text-white">
+  Content
+</div>
+
+// ❌ BAD - Direct hex values
+const buttonColor = "#4f46e5";
+```
+
+**✅ ALWAYS do this:**
+```typescript
+// ✅ GOOD - Use theme tokens from ThemeProvider
+import { useTheme } from "@/components/theme/ThemeProvider";
+
+const MyComponent = () => {
+  const { tokens } = useTheme();
+  
+  return (
+    <button 
+      style={{ 
+        backgroundColor: tokens.button, 
+        color: tokens.buttonText 
+      }}
+    >
+      Click me
+    </button>
+  );
+};
+
+// ✅ GOOD - Use CSS variables (if theme system exposes them)
+<button className="bg-[var(--theme-button)] text-[var(--theme-button-text)]">
+  Click me
+</button>
+
+// ✅ GOOD - Use design tokens for semantic colors
+import { colors } from "@/styles/design-tokens";
+
+const errorColor = colors.error[500]; // Use semantic color scale
+```
+
+### Where to Make Color Changes
+
+**For UI element colors (buttons, backgrounds, text, etc.):**
+1. Check `src/components/theme/theme-presets.ts` for existing theme presets
+2. Update the appropriate token in the preset (e.g., `button`, `buttonText`, `accent`)
+3. If adding a new token, update:
+   - `src/components/theme/types.ts` (add to `ThemeTokens` interface)
+   - `src/components/theme/theme-presets.ts` (add to all presets)
+   - `src/components/theme/ThemeProvider.tsx` (if needed for provider logic)
+
+**For base color palette changes:**
+1. Update `src/styles/design-tokens.ts`
+2. Modify the color scales (primary, accent, neutral, etc.)
+
+**For component-specific color usage:**
+1. Import and use theme tokens: `const { tokens } = useTheme()`
+2. Or use design tokens: `import { colors } from "@/styles/design-tokens"`
+3. Never hardcode hex values, RGB values, or color names
+
+### Accessing Theme Tokens
+
+```typescript
+// ✅ GOOD - Using ThemeProvider hook
+import { useTheme } from "@/components/theme/ThemeProvider";
+
+const MyComponent = () => {
+  const { tokens } = useTheme();
+  
+  return (
+    <div style={{ 
+      backgroundColor: tokens.background,
+      color: tokens.textPrimary,
+      borderColor: tokens.border
+    }}>
+      Content
+    </div>
+  );
+};
+```
+
+### Common Color Use Cases
+
+**Buttons:**
+```typescript
+// ✅ GOOD
+const { tokens } = useTheme();
+<button style={{ 
+  backgroundColor: tokens.button, 
+  color: tokens.buttonText 
+}}>
+  Submit
+</button>
+
+// ❌ BAD
+<button style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}>
+  Submit
+</button>
+```
+
+**Text:**
+```typescript
+// ✅ GOOD
+const { tokens } = useTheme();
+<p style={{ color: tokens.textPrimary }}>Primary text</p>
+<span style={{ color: tokens.textSecondary }}>Secondary text</span>
+
+// ❌ BAD
+<p style={{ color: "#0f172a" }}>Primary text</p>
+```
+
+**Backgrounds:**
+```typescript
+// ✅ GOOD
+const { tokens } = useTheme();
+<div style={{ backgroundColor: tokens.background }}>
+  <div style={{ backgroundColor: tokens.card }}>Card content</div>
+</div>
+
+// ❌ BAD
+<div style={{ backgroundColor: "#f8fafc" }}>
+  <div style={{ backgroundColor: "#ffffff" }}>Card content</div>
+</div>
+```
+
+**Accents:**
+```typescript
+// ✅ GOOD
+const { tokens } = useTheme();
+<div style={{ 
+  backgroundColor: tokens.accent, 
+  color: tokens.accentContrast 
+}}>
+  Highlighted content
+</div>
+
+// ❌ BAD
+<div style={{ backgroundColor: "#6366f1", color: "#ffffff" }}>
+  Highlighted content
+</div>
+```
+
+### Pre-Development Checklist
+
+Before making any color changes:
+1. ✅ Identify which theme token should be used (check `ThemeTokens` interface)
+2. ✅ Check if the token exists in theme presets
+3. ✅ If adding a new color need, add it to the theme system first
+4. ✅ Never hardcode colors directly in components
+5. ✅ Test with different theme presets to ensure colors work across themes
+
+### Why This Matters
+
+- **User customization**: Users can change themes, so hardcoded colors break this
+- **Consistency**: All colors come from a single source of truth
+- **Maintainability**: Color changes happen in one place, not scattered across components
+- **Accessibility**: Theme system ensures proper contrast ratios
+- **Dark mode support**: Theme tokens handle light/dark variants automatically
+
+**Remember: If you need to change a color, change it in the theme system, not in the component code!**
+

@@ -7,7 +7,7 @@ export default function SignIn() {
         type="submit"
         className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors cursor-pointer"
       >
-        Sign in with Google
+        Try Impactly
       </button>
     </form>
   );
