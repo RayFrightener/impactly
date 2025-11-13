@@ -43,7 +43,10 @@ export default function JournalTypingArea({
       onKeyDown={onKeyDown || undefined}
       onFocus={onFocus}
       onBlur={onBlur}
-      className="bg-transparent text-[#D0CCCC] text-lg font-mono leading-relaxed w-full outline-none border-none focus:outline-none resize-none min-h-[60px]"
+      className="bg-transparent text-lg font-mono leading-relaxed w-full outline-none border-none focus:outline-none resize-none min-h-[60px] placeholder:text-[var(--theme-placeholder)]"
+      style={{
+        color: "var(--theme-text-primary)",
+      }}
       placeholder={placeholder}
       rows={rows}
     />

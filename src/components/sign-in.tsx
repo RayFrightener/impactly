@@ -1,3 +1,5 @@
+"use client";
+
 import { handleSignIn } from "@/app/actions/auth";
 
 export default function SignIn() {
@@ -5,9 +7,13 @@ export default function SignIn() {
     <form action={handleSignIn}>
       <button
         type="submit"
-        className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors cursor-pointer"
+        className="px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105 hover:opacity-90"
+        style={{
+          backgroundColor: "var(--theme-button)",
+          color: "var(--theme-button-text)",
+        }}
       >
-        Try Impactly
+        Start Your First Journal Entry
       </button>
     </form>
   );
