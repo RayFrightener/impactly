@@ -18,22 +18,17 @@ export default function LandingJournalDemo() {
     {
       id: "demo-1",
       content:
-        "I need to improve the user onboarding flow. The current process is too complex and users are dropping off.",
+        "Idea: Add user authentication so people can save their journals. Right now it's just local storage which is fine but not great for multiple devices.",
     },
     {
       id: "demo-2",
       content:
-        "Consider adding a tutorial or interactive guide for first-time users.",
+        "Feature: Let users export their thoughts as markdown files. Would be nice to have everything backed up in a format I can actually read.",
     },
   ]);
   const [editingThoughtId, setEditingThoughtId] = useState<string | null>(null);
   const [editingThoughtText, setEditingThoughtText] = useState<string>("");
   const [selectedText, setSelectedText] = useState<string>("");
-  const [extractedText, setExtractedText] = useState<string>(""); // Store text for modal
-  const [showExtractModal, setShowExtractModal] = useState(false);
-  const [extractType, setExtractType] = useState<
-    "action-item" | "requirement" | "feature" | "improvement"
-  >("action-item");
   const [selectionPosition, setSelectionPosition] = useState<{
     top: number;
     left: number;
@@ -45,38 +40,6 @@ export default function LandingJournalDemo() {
   // Handle text selection
   useEffect(() => {
     if (!containerRef.current) return;
-
-    // Helper function to check if a node is within a thought content div
-    const isInThoughtDiv = (node: Node | null): boolean => {
-      if (!node) return false;
-
-      // Get the element (either the node itself or its parent if it's a text node)
-      let element: Element | null = null;
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        element = node as Element;
-      } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
-        element = node.parentElement;
-      }
-
-      if (!element) return false;
-
-      // Traverse up the DOM tree to find a thought content div
-      // Thought content divs have the class "select-text" along with "font-mono" and "whitespace-pre-wrap"
-      let current: Element | null = element;
-      while (current) {
-        // Check for the key identifying classes of thought content divs
-        if (
-          current.classList.contains("select-text") &&
-          current.classList.contains("font-mono") &&
-          current.classList.contains("whitespace-pre-wrap")
-        ) {
-          return true;
-        }
-        current = current.parentElement;
-      }
-
-      return false;
-    };
 
     const handleSelection = () => {
       const selection = window.getSelection();
@@ -95,33 +58,32 @@ export default function LandingJournalDemo() {
         return;
       }
 
-      // Check if selection is within a thought content div
-      const isInThought =
-        isInThoughtDiv(range.startContainer) ||
-        isInThoughtDiv(range.endContainer) ||
-        isInThoughtDiv(selection.anchorNode) ||
-        isInThoughtDiv(selection.focusNode);
+      const startContainer = range.startContainer;
+      const container = containerRef.current;
+
+      if (!container) return;
+
+      // Check if selection is in a thought content div
+      const thoughtContentDivs = Array.from(
+        container.querySelectorAll(".select-text.font-mono.whitespace-pre-wrap")
+      );
+      let isInThought = false;
+      for (const thoughtDiv of thoughtContentDivs) {
+        if (
+          thoughtDiv.contains(startContainer) ||
+          thoughtDiv === startContainer
+        ) {
+          isInThought = true;
+          break;
+        }
+      }
 
       // Check if selection is within textarea
-      // For textarea, check if the active element is the textarea
-      // or if any selection nodes are within the textarea
       let isInTextarea = false;
       if (textareaRef.current) {
-        // Check if textarea is focused (most reliable for textarea selections)
-        if (document.activeElement === textareaRef.current) {
-          isInTextarea = true;
-        }
-        // Also check if selection nodes are within textarea
-        const startContainer = range.startContainer;
-        const endContainer = range.endContainer;
-
         if (
           textareaRef.current.contains(startContainer) ||
-          textareaRef.current.contains(endContainer) ||
-          (selection.anchorNode &&
-            textareaRef.current.contains(selection.anchorNode)) ||
-          (selection.focusNode &&
-            textareaRef.current.contains(selection.focusNode))
+          textareaRef.current === startContainer
         ) {
           isInTextarea = true;
         }
@@ -139,14 +101,19 @@ export default function LandingJournalDemo() {
       // Get position for quick actions menu (using viewport coordinates for fixed positioning)
       const rect = range.getBoundingClientRect();
       setSelectionPosition({
-        top: rect.bottom + window.scrollY + 10,
-        left: rect.left + window.scrollX,
+        top: rect.bottom + 10,
+        left: rect.left,
       });
     };
 
-    document.addEventListener("selectionchange", handleSelection);
-    return () =>
-      document.removeEventListener("selectionchange", handleSelection);
+    const element = containerRef.current;
+    element.addEventListener("mouseup", handleSelection);
+    element.addEventListener("keyup", handleSelection);
+
+    return () => {
+      element.removeEventListener("mouseup", handleSelection);
+      element.removeEventListener("keyup", handleSelection);
+    };
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -172,7 +139,7 @@ export default function LandingJournalDemo() {
     }
   };
 
-  const handleSaveEditedThought = (thoughtId: string) => {
+  const handleSaveEditedThought = (_thoughtId: string) => {
     // Demo only - just exit edit mode
     setEditingThoughtId(null);
     setEditingThoughtText("");
@@ -183,16 +150,12 @@ export default function LandingJournalDemo() {
   };
 
   const handleExtractClick = (
-    type: "action-item" | "requirement" | "feature" | "improvement"
+    _type: "action-item" | "requirement" | "feature" | "improvement"
   ) => {
-    if (selectedText) {
-      setExtractedText(selectedText);
-      setExtractType(type);
-      setShowExtractModal(true);
-      window.getSelection()?.removeAllRanges();
-      setSelectedText("");
-      setSelectionPosition(null);
-    }
+    // Demo only - just close the menu, no functionality
+    window.getSelection()?.removeAllRanges();
+    setSelectedText("");
+    setSelectionPosition(null);
   };
 
   const placeholder =
@@ -575,193 +538,6 @@ export default function LandingJournalDemo() {
             >
               ×
             </button>
-          </div>
-        )}
-
-        {/* Extraction Modal */}
-        {showExtractModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div
-              className="rounded-lg p-6 max-w-lg w-full mx-4"
-              style={{
-                backgroundColor: "#171717",
-                border: "1px solid #867979",
-              }}
-            >
-              <h3
-                className="text-xl font-semibold mb-4"
-                style={{ color: "#D0CCCC" }}
-              >
-                Extract as{" "}
-                {extractType === "feature"
-                  ? "Feature"
-                  : extractType === "improvement"
-                  ? "Improvement"
-                  : extractType === "requirement"
-                  ? "Requirement"
-                  : extractType === "action-item"
-                  ? "Action Item"
-                  : "Text"}
-              </h3>
-
-              <div className="mb-4">
-                <label
-                  className="block text-sm font-medium mb-2"
-                  style={{ color: "#D0CCCC" }}
-                >
-                  Selected Text
-                </label>
-                <p
-                  className="p-3 rounded"
-                  style={{
-                    color: "#D0CCCC",
-                    backgroundColor: "rgba(134, 121, 121, 0.1)",
-                  }}
-                >
-                  {extractedText ||
-                    "Select a piece of your thought and then add that Extract as action item"}
-                </p>
-                {!extractedText && (
-                  <p
-                    className="text-xs mt-2 italic"
-                    style={{ color: "#867979" }}
-                  >
-                    Select a piece of your thought and then add that Extract as
-                    action item
-                  </p>
-                )}
-              </div>
-
-              {extractType === "feature" && (
-                <div className="space-y-4 mb-4">
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-2"
-                      style={{ color: "#D0CCCC" }}
-                    >
-                      Description (optional)
-                    </label>
-                    <textarea
-                      placeholder="Add more details about this feature..."
-                      rows={3}
-                      className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
-                      style={{
-                        backgroundColor: "#171717",
-                        border: "1px solid #867979",
-                        color: "#D0CCCC",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-2"
-                      style={{ color: "#D0CCCC" }}
-                    >
-                      Impact (optional)
-                    </label>
-                    <textarea
-                      placeholder="How does this create impact?"
-                      rows={2}
-                      className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
-                      style={{
-                        backgroundColor: "#171717",
-                        border: "1px solid #867979",
-                        color: "#D0CCCC",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {extractType === "improvement" && (
-                <div className="space-y-4 mb-4">
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-2"
-                      style={{ color: "#D0CCCC" }}
-                    >
-                      Link to Feature
-                    </label>
-                    <select
-                      className="w-full px-4 py-3 rounded-lg focus:outline-none"
-                      style={{
-                        backgroundColor: "#171717",
-                        border: "1px solid #867979",
-                        color: "#D0CCCC",
-                      }}
-                    >
-                      <option value="__new">Create new feature</option>
-                      <option value="feature-1">User Onboarding</option>
-                      <option value="feature-2">Dashboard</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-2"
-                      style={{ color: "#D0CCCC" }}
-                    >
-                      Improvement Notes (optional)
-                    </label>
-                    <textarea
-                      placeholder="Add context or acceptance criteria for this improvement..."
-                      rows={3}
-                      className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none"
-                      style={{
-                        backgroundColor: "#171717",
-                        border: "1px solid #867979",
-                        color: "#D0CCCC",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowExtractModal(false);
-                    setExtractedText("");
-                    setSelectedText("");
-                    setSelectionPosition(null);
-                  }}
-                  className="flex-1 px-4 py-2 rounded transition"
-                  style={{
-                    backgroundColor: "#867979",
-                    color: "#ffffff",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#756868";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#867979";
-                  }}
-                >
-                  Extract
-                </button>
-                <button
-                  onClick={() => {
-                    setShowExtractModal(false);
-                    setExtractedText("");
-                    setSelectedText("");
-                    setSelectionPosition(null);
-                  }}
-                  className="flex-1 px-4 py-2 border rounded transition"
-                  style={{
-                    borderColor: "#867979",
-                    color: "#D0CCCC",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "rgba(134, 121, 121, 0.2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </div>
