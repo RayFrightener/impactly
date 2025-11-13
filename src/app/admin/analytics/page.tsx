@@ -59,6 +59,44 @@ interface AdminAnalyticsData {
       id: number;
     };
   }>;
+  performance?: {
+    webVitals: {
+      lcp: {
+        avg: number;
+        p50: number;
+        p75: number;
+        p95: number;
+        count: number;
+      };
+      fid: {
+        avg: number;
+        p50: number;
+        p75: number;
+        p95: number;
+        count: number;
+      };
+      cls: {
+        avg: number;
+        p50: number;
+        p75: number;
+        p95: number;
+        count: number;
+      };
+    };
+    pageLoad: {
+      avg: number;
+      p50: number;
+      p75: number;
+      p95: number;
+      count: number;
+    };
+    slowPages: Array<{
+      page: string;
+      loadTime: number;
+      count: number;
+      avgLoadTime: number;
+    }>;
+  };
 }
 
 export default function AdminAnalyticsPage() {
@@ -272,6 +310,196 @@ User Engagement:
                 Manage Feedback →
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Performance Metrics */}
+        {analytics.performance && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">
+              Performance Metrics (Last 7 Days)
+            </h3>
+
+            {/* Web Vitals */}
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-slate-700 mb-3">Core Web Vitals</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* LCP */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-600">LCP</span>
+                    <span className="text-xs text-slate-500">
+                      {analytics.performance.webVitals.lcp.count} samples
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 mb-1">
+                    {(analytics.performance.webVitals.lcp.avg / 1000).toFixed(2)}s
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    P50: {(analytics.performance.webVitals.lcp.p50 / 1000).toFixed(2)}s | P95:{" "}
+                    {(analytics.performance.webVitals.lcp.p95 / 1000).toFixed(2)}s
+                  </div>
+                  <div className="mt-2">
+                    <div
+                      className={`text-xs font-medium ${
+                        analytics.performance.webVitals.lcp.avg < 2500
+                          ? "text-green-600"
+                          : analytics.performance.webVitals.lcp.avg < 4000
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                      }`}
+                    >
+                      {analytics.performance.webVitals.lcp.avg < 2500
+                        ? "Good"
+                        : analytics.performance.webVitals.lcp.avg < 4000
+                          ? "Needs Improvement"
+                          : "Poor"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* FID */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-600">FID</span>
+                    <span className="text-xs text-slate-500">
+                      {analytics.performance.webVitals.fid.count} samples
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 mb-1">
+                    {analytics.performance.webVitals.fid.avg.toFixed(0)}ms
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    P50: {analytics.performance.webVitals.fid.p50.toFixed(0)}ms | P95:{" "}
+                    {analytics.performance.webVitals.fid.p95.toFixed(0)}ms
+                  </div>
+                  <div className="mt-2">
+                    <div
+                      className={`text-xs font-medium ${
+                        analytics.performance.webVitals.fid.avg < 100
+                          ? "text-green-600"
+                          : analytics.performance.webVitals.fid.avg < 300
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                      }`}
+                    >
+                      {analytics.performance.webVitals.fid.avg < 100
+                        ? "Good"
+                        : analytics.performance.webVitals.fid.avg < 300
+                          ? "Needs Improvement"
+                          : "Poor"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* CLS */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-600">CLS</span>
+                    <span className="text-xs text-slate-500">
+                      {analytics.performance.webVitals.cls.count} samples
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 mb-1">
+                    {analytics.performance.webVitals.cls.avg.toFixed(3)}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    P50: {analytics.performance.webVitals.cls.p50.toFixed(3)} | P95:{" "}
+                    {analytics.performance.webVitals.cls.p95.toFixed(3)}
+                  </div>
+                  <div className="mt-2">
+                    <div
+                      className={`text-xs font-medium ${
+                        analytics.performance.webVitals.cls.avg < 0.1
+                          ? "text-green-600"
+                          : analytics.performance.webVitals.cls.avg < 0.25
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                      }`}
+                    >
+                      {analytics.performance.webVitals.cls.avg < 0.1
+                        ? "Good"
+                        : analytics.performance.webVitals.cls.avg < 0.25
+                          ? "Needs Improvement"
+                          : "Poor"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Page Load Times */}
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-slate-700 mb-3">Page Load Performance</h4>
+              <div className="border border-slate-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-600">Average Load Time</span>
+                  <span className="text-xs text-slate-500">
+                    {analytics.performance.pageLoad.count} samples
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">
+                  {(analytics.performance.pageLoad.avg / 1000).toFixed(2)}s
+                </div>
+                <div className="text-xs text-slate-500">
+                  P50: {(analytics.performance.pageLoad.p50 / 1000).toFixed(2)}s | P75:{" "}
+                  {(analytics.performance.pageLoad.p75 / 1000).toFixed(2)}s | P95:{" "}
+                  {(analytics.performance.pageLoad.p95 / 1000).toFixed(2)}s
+                </div>
+              </div>
+            </div>
+
+            {/* Slow Pages */}
+            {analytics.performance.slowPages.length > 0 && (
+              <div>
+                <h4 className="text-md font-semibold text-slate-700 mb-3">Slowest Pages</h4>
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-2">
+                          Page
+                        </th>
+                        <th className="text-right text-xs font-semibold text-slate-600 px-4 py-2">
+                          Avg Load Time
+                        </th>
+                        <th className="text-right text-xs font-semibold text-slate-600 px-4 py-2">
+                          Samples
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.performance.slowPages.map((page, index) => (
+                        <tr
+                          key={index}
+                          className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                        >
+                          <td className="px-4 py-2 text-sm text-slate-900 font-mono">
+                            {page.page}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-right">
+                            <span
+                              className={`font-semibold ${
+                                page.avgLoadTime > 5000
+                                  ? "text-red-600"
+                                  : page.avgLoadTime > 3000
+                                    ? "text-yellow-600"
+                                    : "text-slate-900"
+                              }`}
+                            >
+                              {(page.avgLoadTime / 1000).toFixed(2)}s
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-sm text-right text-slate-600">
+                            {page.count}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

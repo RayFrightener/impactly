@@ -9,6 +9,8 @@ import {
   DEFAULT_THEME_ID,
   THEME_PRESETS,
 } from "@/components/theme/theme-presets";
+import WebVitalsReporter from "@/components/WebVitalsReporter";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,7 +65,11 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={inlineThemeVariables}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <WebVitalsReporter />
+          {children}
+        </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );

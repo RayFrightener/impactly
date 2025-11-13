@@ -185,6 +185,100 @@ export async function getAdminAnalytics() {
     },
   });
 
+  // Performance metrics aggregation
+  const performanceEvents = await prisma.analytics.findMany({
+    where: {
+      eventType: {
+        in: ["web_vital", "page_load", "component_render", "api_request"],
+      },
+      createdAt: {
+        gte: oneWeekAgo,
+      },
+    },
+    select: {
+      eventType: true,
+      eventData: true,
+      duration: true,
+      createdAt: true,
+    },
+  });
+
+  // Calculate Web Vitals statistics
+  const webVitals = performanceEvents.filter((e) => e.eventType === "web_vital");
+  const lcpValues = webVitals
+    .filter((e) => {
+      const data = e.eventData as { metricName?: string; value?: number } | null;
+      return data?.metricName === "LCP" && typeof data.value === "number";
+    })
+    .map((e) => {
+      const data = e.eventData as { value: number };
+      return data.value;
+    });
+  const fidValues = webVitals
+    .filter((e) => {
+      const data = e.eventData as { metricName?: string; value?: number } | null;
+      return data?.metricName === "FID" && typeof data.value === "number";
+    })
+    .map((e) => {
+      const data = e.eventData as { value: number };
+      return data.value;
+    });
+  const clsValues = webVitals
+    .filter((e) => {
+      const data = e.eventData as { metricName?: string; value?: number } | null;
+      return data?.metricName === "CLS" && typeof data.value === "number";
+    })
+    .map((e) => {
+      const data = e.eventData as { value: number };
+      return data.value;
+    });
+
+  const calculatePercentile = (values: number[], percentile: number): number => {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+    return sorted[Math.max(0, index)] || 0;
+  };
+
+  const avgLcp = lcpValues.length > 0 ? lcpValues.reduce((a, b) => a + b, 0) / lcpValues.length : 0;
+  const avgFid = fidValues.length > 0 ? fidValues.reduce((a, b) => a + b, 0) / fidValues.length : 0;
+  const avgCls = clsValues.length > 0 ? clsValues.reduce((a, b) => a + b, 0) / clsValues.length : 0;
+
+  // Page load times
+  const pageLoadEvents = performanceEvents.filter((e) => e.eventType === "page_load");
+  const pageLoadTimes = pageLoadEvents
+    .filter((e) => e.duration !== null)
+    .map((e) => e.duration as number);
+  const avgPageLoadTime = pageLoadTimes.length > 0
+    ? pageLoadTimes.reduce((a, b) => a + b, 0) / pageLoadTimes.length
+    : 0;
+
+  // Slow pages (pages with load time > 3s)
+  const slowPages = pageLoadEvents
+    .filter((e) => {
+      const data = e.eventData as { page?: string; value?: number } | null;
+      return (data?.value || e.duration || 0) > 3000;
+    })
+    .map((e) => {
+      const data = e.eventData as { page?: string; value?: number } | null;
+      return {
+        page: data?.page || "unknown",
+        loadTime: data?.value || e.duration || 0,
+      };
+    })
+    .reduce((acc, curr) => {
+      const existing = acc.find((p) => p.page === curr.page);
+      if (existing) {
+        existing.count++;
+        existing.avgLoadTime = (existing.avgLoadTime + curr.loadTime) / 2;
+      } else {
+        acc.push({ ...curr, count: 1, avgLoadTime: curr.loadTime });
+      }
+      return acc;
+    }, [] as Array<{ page: string; loadTime: number; count: number; avgLoadTime: number }>)
+    .sort((a, b) => b.avgLoadTime - a.avgLoadTime)
+    .slice(0, 10);
+
   return {
     overview: {
       totalUsers,
@@ -205,6 +299,39 @@ export async function getAdminAnalytics() {
       completedFeedback,
       featureRequests,
       bugs,
+    },
+    performance: {
+      webVitals: {
+        lcp: {
+          avg: avgLcp,
+          p50: calculatePercentile(lcpValues, 50),
+          p75: calculatePercentile(lcpValues, 75),
+          p95: calculatePercentile(lcpValues, 95),
+          count: lcpValues.length,
+        },
+        fid: {
+          avg: avgFid,
+          p50: calculatePercentile(fidValues, 50),
+          p75: calculatePercentile(fidValues, 75),
+          p95: calculatePercentile(fidValues, 95),
+          count: fidValues.length,
+        },
+        cls: {
+          avg: avgCls,
+          p50: calculatePercentile(clsValues, 50),
+          p75: calculatePercentile(clsValues, 75),
+          p95: calculatePercentile(clsValues, 95),
+          count: clsValues.length,
+        },
+      },
+      pageLoad: {
+        avg: avgPageLoadTime,
+        p50: calculatePercentile(pageLoadTimes, 50),
+        p75: calculatePercentile(pageLoadTimes, 75),
+        p95: calculatePercentile(pageLoadTimes, 95),
+        count: pageLoadTimes.length,
+      },
+      slowPages,
     },
     userMetrics,
     recentEvents,
@@ -255,5 +382,36 @@ export async function trackTaskCompleted(taskId: string) {
 
   await incrementUserMetric(session.user.id, "completedTasks");
   await trackUserEvent("task_completed", { taskId });
+}
+
+/**
+ * Track a performance metric
+ */
+export async function trackPerformanceMetric(
+  eventType: "page_load" | "web_vital" | "component_render" | "api_request",
+  metricName: string,
+  value: number,
+  page?: string,
+  metadata?: Record<string, unknown>
+) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  const headersList = await headers();
+  const userAgent = headersList.get("user-agent") || undefined;
+
+  await trackEvent({
+    userId: session.user.id,
+    eventType,
+    eventData: {
+      metricName,
+      value,
+      page,
+      ...metadata,
+    },
+    duration: Math.round(value), // Round to integer for duration field
+    userAgent,
+    platform: "web",
+  });
 }
 

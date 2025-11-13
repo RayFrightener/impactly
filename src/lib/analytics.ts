@@ -11,7 +11,11 @@ export type AnalyticsEventType =
   | "thought_created"
   | "journal_entry_created"
   | "feedback_submitted"
-  | "page_view";
+  | "page_view"
+  | "page_load"
+  | "web_vital"
+  | "component_render"
+  | "api_request";
 
 interface TrackEventParams {
   userId: string;
