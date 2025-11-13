@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import SignOut from "@/components/sign-out";
 import LoadingScreen from "@/components/LoadingScreen";
 import { getProjects, createProject } from "@/app/actions/projects";
 import { trackSessionStart } from "@/app/actions/analytics";
 import type { ProjectWithRelations } from "@/types";
 import ProjectWorkspace from "./components/ProjectWorkspace";
-import ThemeCustomizer from "@/components/theme/ThemeCustomizer";
+import SettingsModal from "@/components/SettingsModal";
+import JournalShowcase from "@/components/JournalShowcase";
 
 // Type aliases for backward compatibility with existing code
 type Project = ProjectWithRelations & {
@@ -23,7 +23,7 @@ function DashboardContent() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -200,42 +200,59 @@ function DashboardContent() {
     <>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-neutral-50 to-purple-50 p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-16">
-          <div>
-            <h1 className="text-5xl font-light text-gray-900 mb-3">
-              Welcome Back{firstName ? `, ${firstName}` : ""}
-            </h1>
-            <p className="text-gray-600 text-xl leading-relaxed">
-              Your projects and thoughts, all in one place
-            </p>
-          </div>
-          <div className="flex gap-4 items-center">
-            <button
-              onClick={() => router.push("/dashboard/insights")}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
-            >
-              📊 View Insights
-            </button>
+        {/* Top Navigation Bar */}
+        <div className="flex justify-between items-center mb-8">
+          {/* Left Navigation */}
+          <div className="flex gap-3 items-center">
             <button
               onClick={() => router.push("/roadmap")}
-              className="bg-white text-gray-700 px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 font-medium border border-gray-200"
+              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
             >
               🗺️ Roadmap
             </button>
             <button
+              onClick={() => router.push("/dashboard/insights")}
+              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
+            >
+              📊 View Insights
+            </button>
+            <button
               onClick={() => router.push("/journal")}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
+              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
             >
               ✍️ Journal
             </button>
             <button
-              onClick={() => setIsThemeModalOpen(true)}
-              className="bg-white text-gray-700 px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 font-medium border border-gray-200"
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:bg-surface-alt transition font-medium"
             >
-              🎨 Theme
+              ⚙️ Settings
             </button>
-            <SignOut />
           </div>
+
+          {/* Right CTA */}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-button text-button-text px-8 py-3 rounded-xl hover:opacity-90 transition font-semibold text-lg flex items-center gap-3 shadow-md hover:shadow-lg"
+          >
+            <span className="text-2xl">+</span>
+            Create New Project
+          </button>
+        </div>
+
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="text-5xl font-light text-gray-900 mb-3">
+            Welcome Back{firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="text-gray-600 text-xl leading-relaxed">
+            Your projects and thoughts, all in one place
+          </p>
+        </div>
+
+        {/* Journal Showcase */}
+        <div className="mb-10">
+          <JournalShowcase />
         </div>
 
         {loading ? (
@@ -253,16 +270,6 @@ function DashboardContent() {
           </div>
         ) : (
           <>
-            <div className="mb-10">
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-5 rounded-2xl hover:shadow-2xl transition-all duration-200 font-semibold text-lg flex items-center gap-3 hover:scale-105"
-              >
-                <span className="text-3xl">+</span>
-                Create New Project
-              </button>
-            </div>
-
             {activeProjects.length === 0 ? (
               <div className="text-center py-32">
                 <div className="text-7xl mb-6">📝</div>
@@ -580,26 +587,10 @@ function DashboardContent() {
         )}
       </div>
       </div>
-      {isThemeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-2xl font-semibold text-gray-900">
-                Theme &amp; Personalization
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsThemeModalOpen(false)}
-                className="text-2xl leading-none text-gray-500 transition hover:text-gray-800"
-                aria-label="Close theme modal"
-              >
-                ×
-              </button>
-            </div>
-            <ThemeCustomizer />
-          </div>
-        </div>
-      )}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+      />
     </>
   );
 }

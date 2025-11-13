@@ -99,6 +99,10 @@ function JournalPageContent() {
     searchParams.get("projectId") || null
   );
   const [viewMode, setViewMode] = useState<ViewMode>("stream");
+  
+  // Initialize currentThoughtContent - will be auto-committed if from dashboard
+  const [currentThoughtContent, setCurrentThoughtContent] =
+    useState<string>("");
 
   // Stream of consciousness state - Thought-based system
   interface Thought {
@@ -110,8 +114,6 @@ function JournalPageContent() {
 
   const [thoughts, setThoughts] = useState<Thought[]>([]); // Committed thoughts (editable blocks)
   const [newThoughtIds, setNewThoughtIds] = useState<Set<string>>(new Set()); // Track newly added thoughts for animation
-  const [currentThoughtContent, setCurrentThoughtContent] =
-    useState<string>(""); // Active typing area
   const [editingThoughtId, setEditingThoughtId] = useState<string | null>(null); // Which thought is being edited
   const [editingThoughtText, setEditingThoughtText] = useState<string>(""); // Text being edited
   const [draggedThoughtId, setDraggedThoughtId] = useState<string | null>(null); // Thought being dragged
@@ -190,6 +192,10 @@ function JournalPageContent() {
 
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const preventInitialAutosaveRef = useRef(true);
+  const cameFromDashboardRef = useRef<boolean>(false);
+  const hasAutoCommittedRef = useRef<boolean>(false);
+  const hasCreatedFileRef = useRef<boolean>(false);
+  const hasCreatedFileFromDashboardRef = useRef<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -377,6 +383,325 @@ function JournalPageContent() {
     loadProjects();
   }, []);
 
+  // Handle query params from dashboard journal showcase - create file with thought or auto-commit
+  useEffect(() => {
+    // Prevent duplicate processing
+    if (hasAutoCommittedRef.current || hasCreatedFileRef.current || hasCreatedFileFromDashboardRef.current) {
+      return;
+    }
+
+    const thoughtParam = searchParams.get("thought");
+    const contentKeyParam = searchParams.get("contentKey");
+    const projectIdParam = searchParams.get("projectId");
+    const createNewParam = searchParams.get("createNew");
+    const fromDashboardParam = searchParams.get("fromDashboard");
+
+    let contentToCommit = "";
+    let shouldProcess = false;
+    let shouldCreateFile = createNewParam === "true" || fromDashboardParam === "true";
+    let projectIdForFile: string | undefined = undefined; // Store project ID for immediate use
+
+    // Handle new fromDashboard flow (button-based)
+    if (fromDashboardParam === "true" && contentKeyParam) {
+      // Mark that we came from dashboard
+      cameFromDashboardRef.current = true;
+      
+      // Retrieve from localStorage - new format uses journal-dashboard- prefix
+      const storageKey = `journal-dashboard-${contentKeyParam}`;
+      const storedContent = localStorage.getItem(storageKey);
+      if (storedContent) {
+        contentToCommit = storedContent;
+        shouldProcess = true;
+        // Get project ID from localStorage before cleanup
+        const storedProjectId = localStorage.getItem(`${storageKey}-projectId`);
+        // Clean up localStorage after reading
+        localStorage.removeItem(storageKey);
+        if (storedProjectId) {
+          localStorage.removeItem(`${storageKey}-projectId`);
+          projectIdForFile = storedProjectId;
+          // Update state for UI, but use projectIdForFile for file creation
+          if (storedProjectId !== selectedProjectId) {
+            setSelectedProjectId(storedProjectId);
+          }
+        } else if (projectIdParam) {
+          // Fallback to URL param if localStorage doesn't have it
+          projectIdForFile = projectIdParam;
+          if (projectIdParam !== selectedProjectId) {
+            setSelectedProjectId(projectIdParam);
+          }
+        }
+      } else {
+        console.error("Content not found in localStorage for key:", storageKey);
+      }
+    } else if (thoughtParam) {
+      // Legacy: URL param flow
+      cameFromDashboardRef.current = true;
+      
+      // Decode thought content
+      try {
+        contentToCommit = decodeURIComponent(thoughtParam);
+        shouldProcess = true;
+      } catch (err) {
+        console.error("Error decoding thought param:", err);
+        // Fallback: try to decode with error recovery
+        try {
+          contentToCommit = decodeURIComponent(thoughtParam.replace(/%[0-9A-F]{0,2}$/i, ""));
+          shouldProcess = true;
+        } catch (fallbackErr) {
+          console.error("Error in fallback decode:", fallbackErr);
+        }
+      }
+    } else if (contentKeyParam) {
+      // Legacy: sessionStorage flow
+      cameFromDashboardRef.current = true;
+      const storageKey = `journal-content-${contentKeyParam}`;
+      const storedContent = sessionStorage.getItem(storageKey);
+      if (storedContent) {
+        contentToCommit = storedContent;
+        shouldProcess = true;
+        // Clean up sessionStorage after reading
+        sessionStorage.removeItem(storageKey);
+        const storedProjectId = sessionStorage.getItem(`${storageKey}-projectId`);
+        if (storedProjectId) {
+          sessionStorage.removeItem(`${storageKey}-projectId`);
+          if (storedProjectId !== selectedProjectId) {
+            setSelectedProjectId(storedProjectId);
+          }
+        }
+      }
+    } else {
+      // No thought param - not from dashboard
+      cameFromDashboardRef.current = false;
+      hasAutoCommittedRef.current = false; // Reset flag when no param
+      hasCreatedFileRef.current = false;
+      hasCreatedFileFromDashboardRef.current = false;
+    }
+
+    if (shouldProcess && contentToCommit.trim()) {
+      const trimmedContent = contentToCommit.trim();
+      
+      // Calculate word count for metadata
+      const words = trimmedContent.trim().split(/\s+/).filter((w) => w.length > 0);
+      const wordCount = words.length;
+      const lineCount = trimmedContent.split("\n").length;
+
+      if (shouldCreateFile) {
+        // Create new file with thought already included
+        try {
+          hasCreatedFileRef.current = true;
+          hasCreatedFileFromDashboardRef.current = true; // Track dashboard-initiated creation
+          hasAutoCommittedRef.current = true; // Prevent auto-commit after file creation
+          
+          const now = new Date();
+          // Use projectIdForFile if set (from dashboard), otherwise fallback to URL param or current state
+          const finalProjectId = projectIdForFile || projectIdParam || selectedProjectId || undefined;
+          
+          // Generate file name - need to get project name if we have a project ID
+          let defaultName: string;
+          if (finalProjectId) {
+            // Find project name from projects list
+            const project = projects.find((p) => p.id === finalProjectId);
+            const projectName = project?.name || "Project";
+            const pad = (value: number) => value.toString().padStart(2, "0");
+            const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+              now.getDate()
+            )}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+            defaultName = `${projectName} Journal ${timestamp}`;
+          } else {
+            defaultName = generateDefaultFileName();
+          }
+          
+          // Create thought object
+          const newThought: Thought = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            content: trimmedContent,
+          };
+          
+          // Create journal session with thought already included
+          const newSession: JournalSession = {
+            id: Date.now().toString(),
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            rawThoughts: [trimmedContent], // Thought as line for backward compatibility
+            organizedThoughts: [],
+            metadata: {
+              duration: 0,
+              wordCount,
+              lineCount,
+            },
+            projectId: finalProjectId,
+            thoughts: [newThought], // Thought as Thought object
+            sessionStartTime: now.toISOString(),
+          };
+
+          console.log("Creating new journal file with thought:", {
+            content: trimmedContent.substring(0, 50) + "...",
+            projectId: finalProjectId,
+            thoughtId: newThought.id,
+            thoughtsInSession: (newSession as PersistedJournalSession).thoughts?.length || 0,
+          });
+
+          // Save to storage
+          const fileId = saveJournalToStorage(
+            defaultName,
+            newSession,
+            currentFolderPath === "/" ? undefined : currentFolderPath,
+            finalProjectId
+          );
+          
+          console.log("File created with ID:", fileId);
+
+          // Load and open the new file immediately
+          const newFile = loadJournalFromStorage(fileId);
+          if (newFile) {
+            // Load the journal directly - set all state to match the file
+            const journalWithThoughts = newFile as PersistedJournalSession;
+            
+            console.log("Loaded file:", {
+              fileId,
+              hasThoughts: !!journalWithThoughts.thoughts,
+              thoughtsCount: journalWithThoughts.thoughts?.length || 0,
+              rawThoughtsCount: journalWithThoughts.rawThoughts?.length || 0,
+            });
+            
+            // Convert lines to thoughts if loading old format
+            const loadedThoughts: Thought[] = journalWithThoughts.thoughts
+              ? journalWithThoughts.thoughts
+              : (journalWithThoughts.rawThoughts || []).map((line: string, index: number) => ({
+                  id: `thought-${index}-${Date.now()}`,
+                  content: line,
+                }));
+            
+            console.log("Loaded thoughts:", loadedThoughts.length, loadedThoughts);
+            
+            // Set all state to match the file
+            setThoughts(loadedThoughts);
+            setLines(journalWithThoughts.rawThoughts || []);
+            setOrganizedThoughts(journalWithThoughts.organizedThoughts || []);
+            setCurrentLine("");
+            setCurrentThoughtContent("");
+            if (journalWithThoughts.sessionStartTime) {
+              setSessionStartTime(new Date(journalWithThoughts.sessionStartTime));
+            }
+            setCurrentFileId(fileId);
+            const metadata = getItemMetadata(fileId);
+            setCurrentFileMetadata(metadata);
+            if (metadata?.name) {
+              setAutoFileName(metadata.name);
+            }
+            if (metadata?.updatedAt) {
+              const updatedAtValue = new Date(metadata.updatedAt);
+              if (!Number.isNaN(updatedAtValue.getTime())) {
+                setLastSavedAt(updatedAtValue.getTime());
+              }
+            } else {
+              setLastSavedAt(null);
+            }
+            
+            // Trigger file explorer refresh
+            setFileExplorerRefreshTrigger((prev) => prev + 1);
+            
+            preventInitialAutosaveRef.current = true;
+            setAutosaveStatus("idle");
+            setAutosaveError(null);
+            setViewMode("stream");
+            
+            // Scroll to show thoughts after file is loaded
+            const scrollTimer = setTimeout(() => {
+              requestAnimationFrame(() => {
+                if (thoughtsContainerRef.current && loadedThoughts.length > 0) {
+                  // Scroll to bottom to show the thoughts
+                  thoughtsContainerRef.current.scrollTop = thoughtsContainerRef.current.scrollHeight;
+                }
+                // Focus textarea after scrolling
+                if (inputRef.current) {
+                  inputRef.current.focus();
+                }
+              });
+            }, 500);
+            
+            return () => clearTimeout(scrollTimer);
+          } else {
+            // Fallback: if file loading fails, just auto-commit
+            console.error("Failed to load created file, falling back to auto-commit");
+            hasCreatedFileRef.current = false;
+            hasCreatedFileFromDashboardRef.current = false;
+            // Continue to auto-commit fallback below
+          }
+        } catch (error) {
+          console.error("Error creating new file with thought:", error);
+          // Fallback: if file creation fails, just auto-commit
+          hasCreatedFileRef.current = false;
+          hasCreatedFileFromDashboardRef.current = false;
+          // Continue to auto-commit fallback below
+        }
+      }
+
+      // If we didn't create a file (or creation failed), auto-commit to current state
+      if (!hasCreatedFileRef.current) {
+        // Mark that we've auto-committed to prevent duplicates
+        hasAutoCommittedRef.current = true;
+        
+        // Auto-commit the content as a thought (same logic as Shift+Enter)
+        const newThought: Thought = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: trimmedContent,
+        };
+        
+        // Add new thought to the end so it appears at bottom (near input)
+        setThoughts((prev) => [...prev, newThought]);
+        // Mark as new for animation
+        setNewThoughtIds(() => new Set([newThought.id]));
+        // Keep textarea empty so user can continue typing
+        setCurrentThoughtContent("");
+        // Also update lines for backward compatibility
+        setLines((prev) => [...prev, trimmedContent]);
+
+        // Auto-scroll thoughts container to bottom when new thought is added
+        requestAnimationFrame(() => {
+          if (thoughtsContainerRef.current) {
+            const container = thoughtsContainerRef.current;
+            const isNearBottom =
+              container.scrollHeight -
+                container.scrollTop -
+                container.clientHeight <
+              100;
+
+            // Only auto-scroll if user is already near the bottom
+            if (isNearBottom) {
+              // Scroll to the very bottom to show the input area
+              container.scrollTop = container.scrollHeight;
+            }
+          }
+          // Clear animation flag after animation completes
+          setTimeout(() => {
+            setNewThoughtIds((prev) => {
+              const next = new Set(prev);
+              next.delete(newThought.id);
+              return next;
+            });
+          }, 500);
+        });
+
+        // Focus textarea after a delay so user can continue typing
+        const focusTimer = setTimeout(() => {
+          requestAnimationFrame(() => {
+            if (inputRef.current) {
+              inputRef.current.focus();
+            }
+          });
+        }, 300);
+        
+        return () => clearTimeout(focusTimer);
+      }
+    }
+
+    if (projectIdParam && projectIdParam !== selectedProjectId) {
+      setSelectedProjectId(projectIdParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, generateDefaultFileName, currentFolderPath, selectedProjectId]);
+
   // Load saved journals list
   useEffect(() => {
     setSavedJournals(listSavedJournals());
@@ -473,6 +798,12 @@ function JournalPageContent() {
 
   // Load saved journal session
   useEffect(() => {
+    // Don't load from localStorage if we just created a file from dashboard
+    // The file loading logic already handles setting the thoughts
+    if (hasCreatedFileFromDashboardRef.current || currentFileId) {
+      return;
+    }
+
     const saved = localStorage.getItem(
       `journal-session-${selectedProjectId || "home"}`
     );
@@ -503,7 +834,7 @@ function JournalPageContent() {
         console.error("Error loading journal session:", e);
       }
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, currentFileId]);
 
   // Auto-save
   useEffect(() => {
@@ -736,6 +1067,15 @@ function JournalPageContent() {
         // Shift+Enter: Commit thought and create new one
         e.preventDefault();
         if (currentThoughtContent.trim()) {
+          // Clear the "came from dashboard" flag once user commits a thought
+          // This allows file creation after first commit
+          cameFromDashboardRef.current = false;
+          // Reset auto-commit flag to allow future auto-commits
+          hasAutoCommittedRef.current = false;
+          // Reset file creation flags
+          hasCreatedFileRef.current = false;
+          hasCreatedFileFromDashboardRef.current = false;
+          
           const newThought: Thought = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             content: currentThoughtContent.trim(),
@@ -1331,6 +1671,18 @@ function JournalPageContent() {
       const allLines = [...thoughtsAsLines, trimmedCurrent].filter(Boolean);
       const hasMeaningfulContent =
         allLines.length > 0 || organizedThoughts.length > 0;
+
+      // Don't auto-create files if we came from dashboard and have no committed thoughts yet
+      // This allows user to continue typing without creating a file until they commit a thought
+      if (
+        cameFromDashboardRef.current &&
+        thoughts.length === 0 &&
+        !currentFileId &&
+        reason === "auto"
+      ) {
+        setAutosaveStatus("idle");
+        return;
+      }
 
       if (!hasMeaningfulContent && !currentFileId && reason === "auto") {
         setAutosaveStatus("idle");
