@@ -7,6 +7,7 @@ import {
   listSavedJournals,
   loadJournalFromStorage,
   saveJournalToStorage,
+  generateJournalFileName,
   type SavedJournalMetadata,
   type JournalSession,
 } from "@/lib/journalStorage";
@@ -148,7 +149,13 @@ export default function JournalFileSidebar({
         <button
           onClick={() => {
             const now = new Date();
-            const defaultName = `New File ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+            const projectName = selectedProjectId
+              ? projects.find((p) => p.id === selectedProjectId)?.name
+              : undefined;
+            const defaultName = generateJournalFileName(
+              projectName,
+              selectedProjectId || undefined
+            );
             
             // Create empty journal session
             const newSession: JournalSession = {

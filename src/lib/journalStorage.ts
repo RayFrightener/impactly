@@ -68,6 +68,73 @@ export interface JournalFile extends JournalSession {
 
 export type JournalFileSystemItem = JournalFile | JournalFolder;
 
+/**
+ * Generates a default file name in the format: HHMM-project-folder-name-1
+ * Format: 24-hour time (HHMM) + project folder name + sequential number
+ * The sequential number increments for all files in the same project folder
+ * @param projectName - The name of the project (or "Home" if no project)
+ * @param projectId - Optional project ID to filter existing files
+ * @returns Generated file name
+ */
+export function generateJournalFileName(
+  projectName?: string,
+  projectId?: string
+): string {
+  if (typeof window === "undefined") {
+    return "journal";
+  }
+
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, "0");
+  const minutes = now.getMinutes().toString().padStart(2, "0");
+  const timePrefix = `${hours}${minutes}`;
+
+  // Sanitize project name for filename (remove invalid characters)
+  const sanitizeName = (name: string): string => {
+    return name
+      .replace(/[^a-zA-Z0-9\s-_]/g, "") // Remove invalid characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .toLowerCase()
+      .trim();
+  };
+
+  const folderName = projectName
+    ? sanitizeName(projectName)
+    : "home";
+
+  // Get all existing files for this project to find the next number
+  const allFiles = listSavedJournals();
+  const projectFiles = projectId
+    ? allFiles.filter((f) => f.projectId === projectId)
+    : allFiles.filter((f) => !f.projectId);
+
+  // Pattern to match: HHMM-folder-name-NUMBER (any time prefix, same folder name)
+  const pattern = new RegExp(
+    `^\\d{4}-${folderName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`
+  );
+
+  // Find all files matching the pattern and extract their numbers
+  const matchingNumbers: number[] = [];
+  projectFiles.forEach((file) => {
+    const match = file.name.match(pattern);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num)) {
+        matchingNumbers.push(num);
+      }
+    }
+  });
+
+  // Find the next available number
+  let nextNumber = 1;
+  if (matchingNumbers.length > 0) {
+    const maxNumber = Math.max(...matchingNumbers);
+    nextNumber = maxNumber + 1;
+  }
+
+  return `${timePrefix}-${folderName}-${nextNumber}`;
+}
+
 export function saveJournalToStorage(
   name: string,
   data: JournalSession,

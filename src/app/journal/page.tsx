@@ -21,6 +21,7 @@ import {
   renameItem,
   deleteItem,
   migrateFlatStructureToFileSystem,
+  generateJournalFileName,
   type JournalFile,
   type JournalFileSystemItem,
   type JournalSession,
@@ -210,16 +211,11 @@ function JournalPageContent() {
   );
 
   const generateDefaultFileName = useCallback(() => {
-    const now = new Date();
-    const pad = (value: number) => value.toString().padStart(2, "0");
-    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-      now.getDate()
-    )}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-    const projectPrefix = selectedProject
-      ? `${selectedProject.name} Journal`
-      : "Journal";
-    return `${projectPrefix} ${timestamp}`;
-  }, [selectedProject]);
+    return generateJournalFileName(
+      selectedProject?.name,
+      selectedProjectId || undefined
+    );
+  }, [selectedProject, selectedProjectId]);
 
   const resolveActiveFileName = useCallback(() => {
     const trimmedAuto = autoFileName.trim();

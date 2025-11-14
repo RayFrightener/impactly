@@ -1,9 +1,15 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { DEFAULT_THEME_ID, THEME_PRESETS } from "./theme-presets";
-import type { ThemePreset } from "./theme-presets";
-import type { StoredTheme, ThemeTokens } from "./types";
+import type { ThemePreset, StoredTheme, ThemeTokens } from "./types";
 import {
   clearStoredTheme,
   loadStoredTheme,
@@ -25,27 +31,23 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 /**
  * Apply theme tokens to CSS variables synchronously for instant updates
+ * CSS variables set on html cascade to all children, so we only need to set them once
  */
 const applyTokens = (tokens: ThemeTokens, base?: "light" | "dark") => {
   const root = document.documentElement;
   const body = document.body;
-  
+
   // Set CSS variables on root (html) element - these cascade to all children
   Object.entries(tokens).forEach(([token, value]) => {
     root.style.setProperty(`--theme-${token}`, value || "");
   });
-  
-  // Also update body's inline styles to keep them in sync with theme changes
-  // This ensures the background updates immediately, even behind modals
-  Object.entries(tokens).forEach(([token, value]) => {
-    body.style.setProperty(`--theme-${token}`, value || "");
-  });
-  
+
   // Explicitly update body background to ensure it updates behind modals
+  // This is necessary because modals may have overlays that block CSS variable inheritance
   if (tokens.background) {
     body.style.setProperty("background-color", tokens.background);
   }
-  
+
   if (base) {
     root.style.setProperty("color-scheme", base);
   }
@@ -54,7 +56,11 @@ const applyTokens = (tokens: ThemeTokens, base?: "light" | "dark") => {
 /**
  * Dispatch theme change event for instant component reactivity
  */
-const dispatchThemeChange = (presetId: string, tokens: ThemeTokens, base?: "light" | "dark") => {
+const dispatchThemeChange = (
+  presetId: string,
+  tokens: ThemeTokens,
+  base?: "light" | "dark"
+) => {
   const event = new CustomEvent("themechange", {
     detail: { presetId, tokens, base },
     bubbles: true,
@@ -88,21 +94,20 @@ const sanitizeTokens = (tokens: ThemeTokens): ThemeTokens => {
   return Object.fromEntries(entries) as ThemeTokens;
 };
 
-export const ThemeProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [presetId, setPresetId] = useState<string>(DEFAULT_THEME_ID);
   const [customTokens, setCustomTokens] = useState<ThemeTokens | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   // Store committed theme for preview revert functionality
-  const committedThemeRef = useRef<{ tokens: ThemeTokens; base?: "light" | "dark"; presetId: string } | null>(null);
+  const committedThemeRef = useRef<{
+    tokens: ThemeTokens;
+    base?: "light" | "dark";
+    presetId: string;
+  } | null>(null);
 
   const activePreset = useMemo<ThemePreset>(() => {
     return (
-      THEME_PRESETS.find((preset) => preset.id === presetId) ??
-      THEME_PRESETS[0]
+      THEME_PRESETS.find((preset) => preset.id === presetId) ?? THEME_PRESETS[0]
     );
   }, [presetId]);
 
@@ -117,20 +122,19 @@ export const ThemeProvider = ({
   useEffect(() => {
     const stored = loadStoredTheme();
     if (stored) {
-      const storedPreset = stored.id === "custom" 
-        ? null 
-        : THEME_PRESETS.find((preset) => preset.id === stored.id);
-      
-      const storedTokens = stored.id === "custom"
-        ? stored.custom
-        : storedPreset?.tokens;
+      const storedPreset =
+        stored.id === "custom"
+          ? null
+          : THEME_PRESETS.find((preset) => preset.id === stored.id);
+
+      const storedTokens =
+        stored.id === "custom" ? stored.custom : storedPreset?.tokens;
 
       if (storedTokens) {
         const base = storedPreset?.base;
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setPresetId(stored.id);
         if (stored.id === "custom" && stored.custom) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setCustomTokens(stored.custom);
         }
         applyAndSaveTheme(stored.id, storedTokens, base);
@@ -145,8 +149,13 @@ export const ThemeProvider = ({
       clearStoredTheme();
     }
     // Fallback to default theme
-    const defaultPreset = THEME_PRESETS.find((p) => p.id === DEFAULT_THEME_ID) ?? THEME_PRESETS[0];
-    applyAndSaveTheme(DEFAULT_THEME_ID, defaultPreset.tokens, defaultPreset.base);
+    const defaultPreset =
+      THEME_PRESETS.find((p) => p.id === DEFAULT_THEME_ID) ?? THEME_PRESETS[0];
+    applyAndSaveTheme(
+      DEFAULT_THEME_ID,
+      defaultPreset.tokens,
+      defaultPreset.base
+    );
     committedThemeRef.current = {
       tokens: defaultPreset.tokens,
       base: defaultPreset.base,
@@ -174,7 +183,7 @@ export const ThemeProvider = ({
     if (!presetExists) {
       return;
     }
-    
+
     // Apply theme immediately for instant visual feedback
     if (id !== "custom") {
       const preset = THEME_PRESETS.find((p) => p.id === id);
@@ -195,7 +204,7 @@ export const ThemeProvider = ({
         presetId: id,
       };
     }
-    
+
     // Update state
     setPresetId(id);
     if (id !== "custom") {
@@ -205,10 +214,7 @@ export const ThemeProvider = ({
     }
   };
 
-  const handleUpdateCustomToken = (
-    token: keyof ThemeTokens,
-    value: string
-  ) => {
+  const handleUpdateCustomToken = (token: keyof ThemeTokens, value: string) => {
     setPresetId("custom");
     setCustomTokens((previous) => {
       const base = previous ?? tokens;
@@ -228,8 +234,13 @@ export const ThemeProvider = ({
   };
 
   const resetTheme = () => {
-    const defaultPreset = THEME_PRESETS.find((p) => p.id === DEFAULT_THEME_ID) ?? THEME_PRESETS[0];
-    applyAndSaveTheme(DEFAULT_THEME_ID, defaultPreset.tokens, defaultPreset.base);
+    const defaultPreset =
+      THEME_PRESETS.find((p) => p.id === DEFAULT_THEME_ID) ?? THEME_PRESETS[0];
+    applyAndSaveTheme(
+      DEFAULT_THEME_ID,
+      defaultPreset.tokens,
+      defaultPreset.base
+    );
     committedThemeRef.current = {
       tokens: defaultPreset.tokens,
       base: defaultPreset.base,
@@ -248,7 +259,8 @@ export const ThemeProvider = ({
           committedThemeRef.current.tokens,
           committedThemeRef.current.base
         );
-        document.documentElement.dataset.theme = committedThemeRef.current.presetId;
+        document.documentElement.dataset.theme =
+          committedThemeRef.current.presetId;
         dispatchThemeChange(
           committedThemeRef.current.presetId,
           committedThemeRef.current.tokens,
@@ -290,4 +302,3 @@ export const useTheme = () => {
   }
   return context;
 };
-
