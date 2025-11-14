@@ -426,7 +426,6 @@ export default function JournalShowcase() {
         style={{
           minHeight: "400px",
           maxHeight: "600px",
-          height: "600px", // Fixed height ensures flex-1 works properly
         }}
       >
         {/* Selection Quick Actions - Positioned relative to selection */}
