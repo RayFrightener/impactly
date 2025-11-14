@@ -115,7 +115,7 @@ export default function ProjectWorkspace({
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
-              className="text-text-primary hover:text-accent hover:bg-surface-alt px-4 py-2 rounded-lg transition font-medium"
+              className="text-text-primary px-4 py-2 rounded-lg transition font-medium cursor-pointer"
             >
               ← Back to Projects
             </button>
@@ -132,7 +132,7 @@ export default function ProjectWorkspace({
               </div>
               <button
                 onClick={handleDeleteProject}
-                className="text-text-primary hover:text-red-400 hover:bg-red-50 px-3 py-2 rounded-lg transition font-medium text-sm"
+                className="text-text-primary px-3 py-2 rounded-lg transition font-medium text-sm cursor-pointer"
                 title="Delete project"
               >
                 Delete

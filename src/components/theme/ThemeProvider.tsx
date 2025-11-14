@@ -28,9 +28,24 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
  */
 const applyTokens = (tokens: ThemeTokens, base?: "light" | "dark") => {
   const root = document.documentElement;
+  const body = document.body;
+  
+  // Set CSS variables on root (html) element - these cascade to all children
   Object.entries(tokens).forEach(([token, value]) => {
     root.style.setProperty(`--theme-${token}`, value || "");
   });
+  
+  // Also update body's inline styles to keep them in sync with theme changes
+  // This ensures the background updates immediately, even behind modals
+  Object.entries(tokens).forEach(([token, value]) => {
+    body.style.setProperty(`--theme-${token}`, value || "");
+  });
+  
+  // Explicitly update body background to ensure it updates behind modals
+  if (tokens.background) {
+    body.style.setProperty("background-color", tokens.background);
+  }
+  
   if (base) {
     root.style.setProperty("color-scheme", base);
   }
