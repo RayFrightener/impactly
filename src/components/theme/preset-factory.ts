@@ -1,5 +1,5 @@
 import type { PresetConfig, ThemePreset, ThemeTokens } from "./types";
-import { lighten, adjustSaturation } from "./color-utils";
+import { lighten, darken, adjustSaturation } from "./color-utils";
 
 /**
  * Creates a theme preset from a configuration
@@ -49,8 +49,10 @@ export function createPreset(config: PresetConfig): ThemePreset {
     // Progress: slightly lighter version of button
     progress: lighten(baseButton, 5),
 
-    // Placeholder: muted version of button, lightened
-    placeholder: lighten(baseButton, 30),
+    // Placeholder: darker, more readable version - use textSecondary as base
+    // Darken it slightly to make it more readable while still being distinct from primary text
+    // This ensures good readability - darker than before but still lighter than textPrimary
+    placeholder: darken("#475569", 5), // Start from textSecondary (#475569) and darken slightly for better readability
   };
 
   // Apply any overrides
