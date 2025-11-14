@@ -1,7 +1,10 @@
 {
   "git": {
     "deploymentEnabled": {
-      "main": true
+      "main": true,
+      "preview": true,
+      "experiment": false,
+      "stable": false
     }
   },
   "github": {
