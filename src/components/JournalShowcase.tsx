@@ -59,6 +59,7 @@ export default function JournalShowcase() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const editingTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const thoughtsContainerRef = useRef<HTMLDivElement>(null);
 
   // Load projects
   useEffect(() => {
@@ -192,6 +193,26 @@ export default function JournalShowcase() {
       };
       setThoughts((prev) => [...prev, newThought]);
       setCurrentThoughtContent("");
+
+      // Auto-scroll thoughts container to bottom when new thought is added
+      // This ensures the input area stays visible at the bottom
+      // Only auto-scroll if we're already near the bottom (within 100px)
+      requestAnimationFrame(() => {
+        if (thoughtsContainerRef.current) {
+          const container = thoughtsContainerRef.current;
+          const isNearBottom =
+            container.scrollHeight -
+              container.scrollTop -
+              container.clientHeight <
+            100;
+
+          // Only auto-scroll if user is already near the bottom
+          if (isNearBottom) {
+            // Scroll to the very bottom to show the input area
+            container.scrollTop = container.scrollHeight;
+          }
+        }
+      });
     }
     // Regular Enter: allow default behavior (newline)
   };
@@ -402,7 +423,11 @@ export default function JournalShowcase() {
       {/* Main Content Area - Scrollable thoughts with input at bottom */}
       <div
         className="px-8 py-12 flex flex-col overflow-hidden relative"
-        style={{ minHeight: "400px", maxHeight: "600px" }}
+        style={{
+          minHeight: "400px",
+          maxHeight: "600px",
+          height: "600px", // Fixed height ensures flex-1 works properly
+        }}
       >
         {/* Selection Quick Actions - Positioned relative to selection */}
         {selectedText && selectionPosition && (
@@ -482,8 +507,9 @@ export default function JournalShowcase() {
         )}
 
         <div className="max-w-4xl mx-auto w-full flex flex-col h-full min-h-0">
-          {/* Scrollable Thoughts Container */}
+          {/* Scrollable Thoughts Container - Scrolls internally when content overflows */}
           <div
+            ref={thoughtsContainerRef}
             className="flex-1 flex flex-col overflow-y-auto min-h-0 pr-2 mb-4"
             style={{
               scrollBehavior: "smooth",
