@@ -42,6 +42,12 @@ const applyTokens = (tokens: ThemeTokens, base?: "light" | "dark") => {
     root.style.setProperty(`--theme-${token}`, value || "");
   });
 
+  // Also update body's inline styles to keep them in sync with theme changes
+  // This ensures the background updates immediately, even behind modals
+  Object.entries(tokens).forEach(([token, value]) => {
+    body.style.setProperty(`--theme-${token}`, value || "");
+  });
+
   // Explicitly update body background to ensure it updates behind modals
   // This is necessary because modals may have overlays that block CSS variable inheritance
   if (tokens.background) {

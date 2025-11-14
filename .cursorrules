@@ -80,6 +80,32 @@ const formatDate = (date: string): string => {
 };
 ```
 
+#### Unknown Types in JSX Conditionals
+When using `unknown` types in JSX conditionals, TypeScript cannot infer that the value is safe to render. Use explicit null checks instead of truthy checks.
+
+```typescript
+// ❌ BAD - Type error: Type 'unknown' is not assignable to type 'ReactNode'
+{event.eventData && (
+  <div>{JSON.stringify(event.eventData, null, 2)}</div>
+)}
+
+// ✅ GOOD - Use explicit null check to properly narrow the type
+{event.eventData != null && (
+  <div>{JSON.stringify(event.eventData, null, 2)}</div>
+)}
+
+// ✅ ALSO GOOD - Use type guard function for complex cases
+const hasEventData = (data: unknown): data is Record<string, unknown> => {
+  return data != null && typeof data === "object";
+};
+
+{hasEventData(event.eventData) && (
+  <div>{JSON.stringify(event.eventData, null, 2)}</div>
+)}
+```
+
+**Why this matters:** TypeScript's type system requires explicit type narrowing for `unknown` types. Using `!= null` (which checks for both `null` and `undefined`) properly narrows the type and allows TypeScript to understand the value can be used in the conditional.
+
 ### Next.js 15 Requirements
 
 #### Dynamic Route Params
@@ -618,4 +644,176 @@ Before making any color changes:
 - **Dark mode support**: Theme tokens handle light/dark variants automatically
 
 **Remember: If you need to change a color, change it in the theme system, not in the component code!**
+
+## Theme Change Implementation Rules
+
+**CRITICAL: Theme changes MUST be instant and provide immediate visual feedback. This has been a major pain point - follow these rules exactly.**
+
+### When Implementing Theme Changes
+
+**ALWAYS follow this pattern in `ThemeProvider.tsx`:**
+
+1. **The `applyTokens` function MUST update BOTH root and body:**
+```typescript
+// ✅ GOOD - Updates both root and body
+const applyTokens = (tokens: ThemeTokens, base?: "light" | "dark") => {
+  const root = document.documentElement;
+  const body = document.body;
+
+  // Set CSS variables on root (html) element - these cascade to all children
+  Object.entries(tokens).forEach(([token, value]) => {
+    root.style.setProperty(`--theme-${token}`, value || "");
+  });
+
+  // ALSO update body's inline styles to keep them in sync with theme changes
+  // This ensures the background updates immediately, even behind modals
+  Object.entries(tokens).forEach(([token, value]) => {
+    body.style.setProperty(`--theme-${token}`, value || "");
+  });
+
+  // Explicitly update body background to ensure it updates behind modals
+  if (tokens.background) {
+    body.style.setProperty("background-color", tokens.background);
+  }
+
+  if (base) {
+    root.style.setProperty("color-scheme", base);
+  }
+};
+```
+
+**❌ NEVER do this:**
+```typescript
+// ❌ BAD - Only updates root, body won't update instantly
+const applyTokens = (tokens: ThemeTokens, base?: "light" | "dark") => {
+  const root = document.documentElement;
+  Object.entries(tokens).forEach(([token, value]) => {
+    root.style.setProperty(`--theme-${token}`, value || "");
+  });
+  // Missing body updates!
+};
+```
+
+2. **Theme changes MUST be applied BEFORE state updates for instant feedback:**
+```typescript
+// ✅ GOOD - Apply theme immediately, then update state
+const handleSetPreset = (id: string) => {
+  const preset = THEME_PRESETS.find((p) => p.id === id);
+  if (preset) {
+    // Apply theme IMMEDIATELY for instant visual feedback
+    applyAndSaveTheme(id, preset.tokens, preset.base);
+    // Then update state
+    setPresetId(id);
+  }
+};
+
+// ❌ BAD - State update first, theme applies later (delayed feedback)
+const handleSetPreset = (id: string) => {
+  setPresetId(id); // State updates first
+  // Theme applies in useEffect later - too slow!
+};
+```
+
+3. **Always dispatch theme change events for component reactivity:**
+```typescript
+// ✅ GOOD - Dispatch event for instant component updates
+const dispatchThemeChange = (
+  presetId: string,
+  tokens: ThemeTokens,
+  base?: "light" | "dark"
+) => {
+  const event = new CustomEvent("themechange", {
+    detail: { presetId, tokens, base },
+    bubbles: true,
+  });
+  document.documentElement.dispatchEvent(event);
+};
+
+// Always call this after applying tokens
+applyTokens(tokens, base);
+dispatchThemeChange(presetId, tokens, base);
+```
+
+### Loading States and Backgrounds
+
+**When creating loading screens or full-page components, ALWAYS use theme tokens:**
+
+```typescript
+// ✅ GOOD - Uses theme background
+import { useTheme } from "@/components/theme/ThemeProvider";
+
+export default function LoadingScreen() {
+  const { tokens } = useTheme();
+  
+  return (
+    <div 
+      className="min-h-screen flex items-center justify-center"
+      style={{ backgroundColor: tokens.background }}
+    >
+      {/* Content */}
+    </div>
+  );
+}
+
+// ❌ BAD - Hardcoded background that won't match theme
+export default function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      {/* Content */}
+    </div>
+  );
+}
+```
+
+### Testing Theme Changes
+
+**Before committing theme-related changes:**
+
+1. ✅ Test theme changes in the theme picker - should be INSTANT
+2. ✅ Test with different presets - all should work immediately
+3. ✅ Test custom token updates - should update instantly
+4. ✅ Test loading screens - should match theme background
+5. ✅ Test modals/overlays - background should update behind them
+6. ✅ Test full-page components - should use theme colors
+
+### Common Mistakes to Avoid
+
+**❌ NEVER:**
+- Only update CSS variables on root (must also update body)
+- Apply theme changes after state updates (must be before)
+- Skip dispatching theme change events
+- Use hardcoded colors in loading states
+- Forget to update body background-color directly
+- Remove the body CSS variable updates (they're critical for modals)
+
+**✅ ALWAYS:**
+- Update both `document.documentElement` AND `document.body`
+- Apply theme changes synchronously before React state updates
+- Dispatch theme change events for component reactivity
+- Use `useTheme()` hook in components that need theme colors
+- Test theme changes immediately after implementation
+- Verify loading screens use theme tokens
+
+### Theme Change Checklist
+
+**When modifying `ThemeProvider.tsx` or theme-related code:**
+
+1. ✅ `applyTokens` updates both root AND body CSS variables
+2. ✅ Body background-color is set directly
+3. ✅ Theme changes apply BEFORE state updates
+4. ✅ Theme change events are dispatched
+5. ✅ Loading screens use theme tokens
+6. ✅ All components using colors use theme tokens
+7. ✅ Tested with multiple theme presets
+8. ✅ Tested with custom theme tokens
+9. ✅ Verified instant visual feedback
+
+### Why This Matters
+
+- **User Experience**: Instant theme changes feel responsive and professional
+- **Visual Consistency**: Body updates ensure modals/overlays match theme
+- **Component Reactivity**: Events ensure all components update immediately
+- **Maintainability**: Following this pattern prevents future pain points
+
+**CRITICAL: If you modify theme change logic, you MUST test that changes are instant. This has been a major pain point - don't break it!**
 
